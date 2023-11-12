@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<Rows>
+  <R><V>a</V><V>U+0061</V><V>61</V><V>0061</V><V>Latin Small Letter A</V></R>
+  <R><V>~</V><V>U+007E</V><V>7E</V><V>007E</V><V>Tilde</V></R>
+  <R><V>¥</V><V>U+00A5</V><V>C2_A5</V><V>00A5</V><V>Yen Sign</V></R>
+  <R><V>»</V><V>U+00BB</V><V>C2_BB</V><V>00BB</V><V>Right-Pointing Double Angle Quotation Mark</V></R>
+  <R><V>½</V><V>U+00BD</V><V>C2_BD</V><V>00BD</V><V>Vulgar Fraction One Half</V></R>
+  <R><V>¿</V><V>U+00BF</V><V>C2_BF</V><V>00BF</V><V>Inverted Question Mark</V></R>
+  <R><V>ß</V><V>U+00DF</V><V>C3_9F</V><V>00DF</V><V>Latin Small Letter Sharp S</V></R>
+  <R><V>ä</V><V>U+00E4</V><V>C3_A4</V><V>00E4</V><V>Latin Small Letter A with Diaeresis</V></R>
+  <R><V>ï</V><V>U+00EF</V><V>C3_AF</V><V>00EF</V><V>Latin Small Letter I with Diaeresis</V></R>
+  <R><V>œ</V><V>U+0153</V><V>C5_93</V><V>0153</V><V>Latin Small Ligature Oe</V></R>
+  <R><V>€</V><V>U+20AC</V><V>E2_82_AC</V><V>20AC</V><V>Euro Sign</V></R>
+  <R><V>東</V><V>U+6771</V><V>E6_9D_B1</V><V>6771</V><V>CJK Unified Ideograph-6771</V></R>
+  <R><V>𝄞</V><V>U+1D11E</V><V>F0_9D_84_9E</V><V>D834_DD1E</V><V>Musical Symbol G Clef</V></R>
+  <R><V>𠀇</V><V>U+20007</V><V>F0_A0_80_87</V><V>D840_DC07</V><V>CJK Unified Ideograph-20007</V></R>
+</Rows>

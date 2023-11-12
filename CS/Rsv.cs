@@ -1,0 +1,222 @@
+﻿/* (C) Stefan John / Stenway / Stenway.com / 2023 */
+#nullable enable
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.IO;
+
+static byte[] EncodeRsv(string?[][] rows) {
+	var parts = new List<byte[]>();
+	var valueTerminatorByte = new byte[]{0xFF};
+	var nullValueByte = new byte[]{0xFE};
+	var rowTerminatorByte = new byte[]{0xFD};
+	var encoder = new UTF8Encoding(false, true);
+	foreach (var row in rows) {
+		foreach (var value in row) {
+			if (value == null) { parts.Add(nullValueByte); }
+			else if (value.Length > 0) { parts.Add(encoder.GetBytes(value)); }
+			parts.Add(valueTerminatorByte);
+		}
+		parts.Add(rowTerminatorByte);
+	}
+	var result = new byte[parts.Sum(part => part.Length)];
+	var stream = new MemoryStream(result);
+	foreach (var part in parts) { stream.Write(part, 0, part.Length); }
+	return result;
+}
+
+static string?[][] DecodeRsv(byte[] bytes) {
+	var decoder = new UTF8Encoding(false, true);
+	var result = new List<string?[]>();
+	var currentRow = new List<string?>();
+	if (bytes.Length > 0 && bytes[bytes.Length-1] != 0xFD) { throw new Exception("Incomplete RSV document"); }
+	int valueStartIndex = 0;
+	for (int i=0; i<bytes.Length; i++) {
+		if (bytes[i] == 0xFF) {
+			int length = i-valueStartIndex;
+			if (length == 0) { currentRow.Add(""); }
+			else if (length == 1 && bytes[valueStartIndex] == 0xFE) { currentRow.Add(null); }
+			else {
+				var valueBytes = bytes.Skip(valueStartIndex).Take(length).ToArray();
+				currentRow.Add(decoder.GetString(valueBytes));
+			}
+			valueStartIndex = i+1;
+		} else if (bytes[i] == 0xFD) {
+			if (i > 0 && valueStartIndex != i) { throw new Exception("Incomplete RSV row"); }
+			result.Add(currentRow.ToArray());
+			currentRow.Clear();
+			valueStartIndex = i+1;
+		}
+	}
+	return result.ToArray();
+}
+
+// ----------------------------------------------------------------------
+
+static void SaveRsv(string?[][] rows, string filePath) {
+	File.WriteAllBytes(filePath, EncodeRsv(rows));
+}
+
+static string?[][] LoadRsv(string filePath) {
+	return DecodeRsv(File.ReadAllBytes(filePath));
+}
+
+static void AppendRsv(string?[][] rows, string filePath, bool continueLastRow = false) {
+	using (FileStream fileStream = File.Open(filePath, FileMode.OpenOrCreate, FileAccess.ReadWrite)) {
+		if (continueLastRow && fileStream.Length > 0) {
+			fileStream.Position = fileStream.Length - 1;
+			if (fileStream.ReadByte() != 0xFD) { throw new Exception("Incomplete RSV document"); }
+			if (rows.Length == 0) return;
+			fileStream.Position = fileStream.Length - 1;
+		} else {
+			fileStream.Position = fileStream.Length;
+		}
+		fileStream.Write(EncodeRsv(rows));
+	}
+}
+
+// ----------------------------------------------------------------------
+
+static IEnumerable<byte[]> SplitBytes(byte[] bytes, byte splitByte) {
+	var lastIndex = -1;
+	for (;;) {
+		var currentIndex = Array.IndexOf(bytes, splitByte, lastIndex+1);
+		if (currentIndex < 0) {
+			yield return bytes.Skip(lastIndex+1).ToArray();
+			yield break;
+		} else {
+			yield return bytes.Skip(lastIndex+1).Take(currentIndex-lastIndex-1).ToArray();
+			lastIndex = currentIndex;
+		}
+	}
+}
+
+static string?[][] DecodeRsvUsingSplit(byte[] bytes) {
+	var decoder = new UTF8Encoding(true, true);
+	if (bytes.LastOrDefault((byte)0xFD) != 0xFD) { throw new Exception("Incomplete RSV document"); }
+	return SplitBytes(bytes, 0xFD).SkipLast(1).Select(
+		(rowBytes) => {
+			if (rowBytes.LastOrDefault((byte)0xFF) != 0xFF) { throw new Exception("Incomplete RSV row"); }
+			return SplitBytes(rowBytes, 0xFF).SkipLast(1).Select(
+				(valueBytes) => {
+					if (valueBytes.Length == 1 && valueBytes[0] == 0xFE) { return null; }
+					else { return decoder.GetString(valueBytes); }
+				}
+			).ToArray();
+		}
+	).ToArray();
+}
+
+static string?[][] LoadRsvUsingSplit(string filePath) {
+	return DecodeRsvUsingSplit(File.ReadAllBytes(filePath));
+}
+
+// ----------------------------------------------------------------------
+
+static string ByteArrayToString(byte[] bytes) {
+	return "["+string.Join(", ", bytes)+"]";
+}
+
+// ----------------------------------------------------------------------
+
+static string EscapeJsonString(string str) {
+	StringBuilder result = new StringBuilder();
+	result.Append("\"");
+	for (int i = 0; i < str.Length; i++) {
+		char c = str[i];
+		if (c == 0x08) { result.Append("\\b"); }
+		else if (c == 0x09) { result.Append("\\t"); }
+		else if (c == 0x0A) { result.Append("\\n"); }
+		else if (c == 0x0C) { result.Append("\\f"); }
+		else if (c == 0x0D) { result.Append("\\r"); }
+		else if (c == 0x22) { result.Append("\\\""); }
+		else if (c == 0x5C) { result.Append("\\\\"); }
+		else if (c >= 0x00 && c <= 0x1F) { result.AppendFormat("\\u{0:x4}", (int)c); }
+		else { result.Append(c); }
+	}
+	result.Append("\"");
+	return result.ToString();
+}
+
+static string RsvToJson(string?[][] rows) {
+	return "["+(rows.Length > 0 ? "\n" : "")+String.Join(",\n", rows.Select((row) => "  ["+String.Join(", ", row.Select(x => x == null ? "null" : EscapeJsonString(x)))+"]"))+"\n]";
+}
+
+static void PrintRsvToJson(string?[][] rows) {
+	Console.WriteLine(RsvToJson(rows));
+}
+
+// ----------------------------------------------------------------------
+
+static void CheckTestFiles() {
+	for (var i=1; i<=79; i++) {
+		var filePath = ".\\..\\TestFiles\\Valid_" + i.ToString("D3");
+		Console.WriteLine("Checking valid test file: " + filePath);
+		var loadedRows = LoadRsv(filePath + ".rsv");
+		var jsonStr = RsvToJson(loadedRows);
+				
+		var loadedJsonStr = File.ReadAllText(filePath + ".json");
+		if (jsonStr != loadedJsonStr) {
+			throw new Exception("JSON mismatch");
+		}
+		
+		var loadedRowsUsingSplit = LoadRsvUsingSplit(filePath + ".rsv");
+		var jsonStrUsingSplit = RsvToJson(loadedRowsUsingSplit);
+		if (jsonStrUsingSplit != loadedJsonStr) {
+			throw new Exception("JSON mismatch - using split");
+		}
+	}
+	
+	for (var i=1; i<=22; i++) {
+		var filePath = ".\\..\\TestFiles\\Invalid_" + i.ToString("D3");
+		Console.WriteLine("Checking invalid test file: " + filePath);
+		var wasError = false;
+		try {
+			var loadedRows = LoadRsv(filePath + ".rsv");
+		} catch(Exception e) {
+			wasError = true;
+		}
+		if (!wasError) {
+			throw new Exception("RSV document is valid");
+		}
+		
+		wasError = false;
+		try {
+			var loadedRowsUsingSplit = LoadRsvUsingSplit(filePath + ".rsv");
+		} catch(Exception e) {
+			wasError = true;
+		}
+		if (!wasError) {
+			throw new Exception("RSV document is valid");
+		}
+	}
+}
+
+// ----------------------------------------------------------------------
+
+string?[][] rows = new []{
+	new []{"Hello", "🌎", null, ""},
+	new []{"A\0B\nC", "Test 𝄞"},
+	new string?[]{},
+	new []{""}
+};
+
+Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+PrintRsvToJson(rows);
+var bytes = EncodeRsv(rows);
+//Console.WriteLine(ByteArrayToString(bytes));
+var decodedRows = DecodeRsv(bytes);
+SaveRsv(rows, "Test.rsv");
+
+var loadedRows = LoadRsv("Test.rsv");
+PrintRsvToJson(loadedRows);
+SaveRsv(loadedRows, "TestResaved.rsv");
+
+AppendRsv(new []{new []{"ABC"}}, "Append.rsv", false);
+
+Console.WriteLine("Done");
+
+CheckTestFiles();

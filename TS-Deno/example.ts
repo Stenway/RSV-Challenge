@@ -20,6 +20,8 @@ console.log("\nLoaded RSV")
 console.log("----------")
 console.log(rsvToJson(loadedRows))
 
+saveRsvSync(loadedRows, "TestResaved.rsv")
+
 console.log("\nXML")
 console.log("---")
 console.log(rsvToXml(rows))

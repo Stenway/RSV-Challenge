@@ -109,7 +109,55 @@ class Rsv {
 			file.close();
 		}
 	}
+
+	// ----------------------------------------------------------------------
 	
+	static final int[] byteClassLookup = {
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+		3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+		4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+		4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+		0, 0, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+		5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+		6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 7, 7,
+		9, 10, 10, 10, 11, 0, 0, 0, 0, 0, 0, 0, 0, 12, 13, 14
+	};
+
+	static final int[] stateTransitionLookup = {
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 2, 0, 0, 0, 3, 4, 6, 5, 7, 8, 9, 1, 10, 11,
+		0, 2, 0, 0, 0, 3, 4, 6, 5, 7, 8, 9, 0, 0, 11,
+		0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 6, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 6, 6, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11,
+		0, 2, 0, 0, 0, 3, 4, 6, 5, 7, 8, 9, 1, 10, 11
+	};
+
+	static boolean isValidRsv(byte[] bytes) {
+		int lastState = 1;
+		for (int i=0; i<bytes.length; i++) {
+			int currentByte = bytes[i] & 0xFF;
+			int currentByteClass = byteClassLookup[currentByte];
+			int newStateLookupIndex = lastState*15+currentByteClass;
+			lastState = stateTransitionLookup[newStateLookupIndex];
+			if (lastState == 0) { return false; }
+		}
+		return (lastState == 1);
+	}
+
 	// ----------------------------------------------------------------------
 
 	static String escapeJsonString(String str) {
@@ -154,7 +202,7 @@ class Rsv {
 	
 	// ----------------------------------------------------------------------
 
-	static void CheckTestFiles(PrintWriter stdout) throws IOException {
+	static void checkTestFiles(PrintWriter stdout) throws IOException {
 		for (int i=1; i<=79; i++) {
 			String filePath = "./../TestFiles/Valid_" + String.format("%03d", i);
 			stdout.println("Checking valid test file: " + filePath);
@@ -165,9 +213,13 @@ class Rsv {
 			if (!jsonStr.equals(loadedJsonStr)) {
 				throw new RuntimeException("JSON mismatch");
 			}
+			
+			if (!isValidRsv(Files.readAllBytes(Paths.get(filePath + ".rsv")))) {
+				throw new RuntimeException("Validation mismatch");
+			}
 		}
 		
-		for (int i=1; i<=22; i++) {
+		for (int i=1; i<=29; i++) {
 			String filePath = "./../TestFiles/Invalid_" + String.format("%03d", i);
 			stdout.println("Checking invalid test file: " + filePath);
 			boolean wasError = false;
@@ -178,6 +230,9 @@ class Rsv {
 			}
 			if (!wasError) {
 				throw new RuntimeException("RSV document is valid");
+			}
+			if (isValidRsv(Files.readAllBytes(Paths.get(filePath + ".rsv")))) {
+				throw new RuntimeException("Validation mismatch");
 			}
 		}
 	}
@@ -198,7 +253,7 @@ class Rsv {
 			
 			appendRsv(new String[][]{{"ABC"}}, "Append.rsv", true);
 			
-			CheckTestFiles(stdout);
+			checkTestFiles(stdout);
 		} catch(Exception e) {
 			System.out.println(e.toString());
 		}

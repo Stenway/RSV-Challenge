@@ -183,6 +183,64 @@ func LoadRsvUsingSplit(filePath string) ([][]NullableString, error) {
 
 // ----------------------------------------------------------------------
 
+var byteClassLookup = []byte{
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+	3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+	4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+	4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+	0, 0, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+	5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+	6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 7, 7,
+	9, 10, 10, 10, 11, 0, 0, 0, 0, 0, 0, 0, 0, 12, 13, 14,
+}
+
+var stateTransitionLookup = []byte{
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 2, 0, 0, 0, 3, 4, 6, 5, 7, 8, 9, 1, 10, 11,
+	0, 2, 0, 0, 0, 3, 4, 6, 5, 7, 8, 9, 0, 0, 11,
+	0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 6, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 6, 6, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11,
+	0, 2, 0, 0, 0, 3, 4, 6, 5, 7, 8, 9, 1, 10, 11,
+}
+
+func IsValidRsv(bytes []byte) bool {
+	lastState := 1
+	for i := 0; i < len(bytes); i++ {
+		currentByte := bytes[i]
+		currentByteClass := byteClassLookup[currentByte]
+		newStateLookupIndex := lastState*15 + int(currentByteClass)
+		lastState = int(stateTransitionLookup[newStateLookupIndex])
+		if lastState == 0 {
+			return false
+		}
+	}
+	return lastState == 1
+}
+
+func IsValidRsvFile(filePath string) (bool, error) {
+	bytes, err := os.ReadFile(filePath)
+	if err != nil {
+		return false, err
+	}
+	return IsValidRsv(bytes), nil
+}
+
+// ----------------------------------------------------------------------
+
 func EscapeJsonString(str string) string {
 	var result strings.Builder
 	result.WriteString("\"")
@@ -273,14 +331,30 @@ func CheckTestFiles() {
 		if jsonStrUsingSplit != loadedJsonStr {
 			panic("JSON mismatch")
 		}
+
+		isValid, err := IsValidRsvFile(filePath + ".rsv")
+		if err != nil {
+			panic("Could not load RSV file")
+		}
+		if isValid == false {
+			panic("Validation mismatch")
+		}
 	}
 
-	for i := 1; i <= 22; i++ {
+	for i := 1; i <= 29; i++ {
 		filePath := fmt.Sprintf("./../TestFiles/Invalid_%03d", i)
 		fmt.Println("Checking invalid test file:", filePath)
 		_, err := LoadRsv(filePath + ".rsv")
 		if err == nil {
 			panic("RSV document is valid")
+		}
+
+		isValid, err := IsValidRsvFile(filePath + ".rsv")
+		if err != nil {
+			panic("Could not load RSV file")
+		}
+		if isValid == true {
+			panic("Validation mismatch")
 		}
 	}
 }

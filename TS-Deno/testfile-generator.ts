@@ -1,7 +1,7 @@
-﻿import { rsvToJson, rsvToSml, rsvToXml } from "./rsv-conv.ts";
+﻿import { rsvToJson, rsvToSml, rsvToXml } from "./rsv-conv.ts"
 import { loadRsvSync, saveRsvSync } from "./rsv-io.ts"
-import { getValidTestCases, getInvalidTestCases } from "./rsv-testcases.ts";
-import { encodeRsv } from "./rsv.ts"
+import { getValidTestCases, getInvalidTestCases } from "./rsv-testcases.ts"
+import { encodeRsv, isValidRsv } from "./rsv.ts"
 
 function getDirectoryPath(): string {
 	return "../TestFiles"
@@ -18,6 +18,7 @@ function areEqual(bytesA: Uint8Array, bytesB: Uint8Array): boolean {
 function saveValidTestCase(i: number, rows: (string | null)[][]) {
 	const path = getDirectoryPath() + "/Valid_"+i.toString().padStart(3, "0")
 	const bytesA = encodeRsv(rows)
+	if (isValidRsv(bytesA) === false) { throw new Error("Validation mismatch") }
 	saveRsvSync(rows, path+".rsv")
 	
 	const customJsonStr = rsvToJson(rows)
@@ -35,16 +36,20 @@ function saveValidTestCase(i: number, rows: (string | null)[][]) {
 	Deno.writeTextFileSync(path+".sml", "\uFEFF"+rsvToSml(rows))
 }
 
-function saveInvalidTestCase(i: number, bytes: number[]) {
+function saveInvalidTestCase(i: number, byteArray: number[]) {
 	const filePath = getDirectoryPath() + "/Invalid_"+i.toString().padStart(3, "0")+".rsv"
-	Deno.writeFileSync(filePath, new Uint8Array(bytes))
+	const bytes = new Uint8Array(byteArray)
+	Deno.writeFileSync(filePath, bytes)
 	
+	let wasError = false
 	try {
 		loadRsvSync(filePath)
 	} catch(_e) {
-		return
+		wasError = true
 	}
-	throw new Error("Test case is not invalid")
+	if (wasError === false) { throw new Error("Test case is not invalid") }
+	
+	if (isValidRsv(bytes) === true) { throw new Error("Validation mismatch") }
 }
 
 function createTestFiles() {

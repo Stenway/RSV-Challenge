@@ -75,7 +75,10 @@ contains
             print *, "Checking valid test file: ", filePath
             loadedRows = loadRsv(filePath // ".rsv", decodeError)
             if (hasValue(decodeError)) then
-                STOP decodeError%value
+                stop decodeError%value
+            end if
+            if (.not. isValidRsvFile(filePath // ".rsv")) then
+                stop "Validation mismatch"
             end if
             jsonStr = rsvToJsonString(loadedRows)
             loadedJsonStr = loadFile(filePath // ".json")
@@ -84,12 +87,15 @@ contains
             end if
         end do
         
-        do i = 1, 22
+        do i = 1, 29
             filePath = "./../TestFiles/Invalid_" // intToStrWithPadding(i)
             print *, "Checking invalid test file: ", filePath
             loadedRows = loadRsv(filePath // ".rsv", decodeError)
             if (.not. hasValue(decodeError)) then
                 stop "RSV document is valid"
+            end if
+            if (isValidRsvFile(filePath // ".rsv")) then
+                stop "Validation mismatch"
             end if
         end do
     end subroutine
@@ -146,7 +152,7 @@ contains
         end do
         result = (lastState == 1)
     end function
-
+    
     ! ----------------------------------------------------------------------
     
     function getCount(str, char) result(result)
@@ -327,6 +333,71 @@ contains
         close(unit)
     end subroutine
 
+    ! ----------------------------------------------------------------------
+    
+    function isValidRsv(str) result(result)
+        character(len=*), intent(in) :: str
+        logical :: result
+        integer :: i, currentByte, currentByteClass, newStateLookupIndex
+        integer :: lastState = 1
+        
+        integer, dimension(256) :: byteClassLookup
+        integer, dimension(180) :: stateTransitionLookup
+        
+        byteClassLookup = (/ &
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, &
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, &
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, &
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, &
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, &
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, &
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, &
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, &
+            2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, &
+            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, &
+            4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, &
+            4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, &
+            0, 0, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, &
+            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, &
+            6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 7, 7, &
+            9, 10, 10, 10, 11, 0, 0, 0, 0, 0, 0, 0, 0, 12, 13, 14 &
+        /)
+        stateTransitionLookup = (/ &
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, &
+            0, 2, 0, 0, 0, 3, 4, 6, 5, 7, 8, 9, 1, 10, 11, &
+            0, 2, 0, 0, 0, 3, 4, 6, 5, 7, 8, 9, 0, 0, 11, &
+            0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, &
+            0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, &
+            0, 0, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, &
+            0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, &
+            0, 0, 0, 6, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, &
+            0, 0, 6, 6, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, &
+            0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, &
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, &
+            0, 2, 0, 0, 0, 3, 4, 6, 5, 7, 8, 9, 1, 10, 11 &
+        /)
+        do i = 1, len(str)
+            currentByte = ichar(str(i:i))
+            currentByteClass = byteClassLookup(currentByte+1)
+            newStateLookupIndex = lastState*15 + currentByteClass
+            lastState = stateTransitionLookup(newStateLookupIndex+1)
+            if (lastState == 0) then
+                result = .false.
+                return
+            endif
+        end do
+        result = (lastState == 1)
+    end function
+
+    function isValidRsvFile(filePath) result(result)
+        character(len=*), Intent(In) :: filePath
+        logical :: result
+        character(len=:), allocatable :: bytes
+        
+        bytes = loadFile(filePath)
+        result = isValidRsv(bytes)
+    end function
+    
     ! ----------------------------------------------------------------------
 
     function getHexChar(i) result(result)

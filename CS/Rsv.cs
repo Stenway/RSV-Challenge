@@ -271,6 +271,6 @@ SaveRsv(loadedRows, "TestResaved.rsv");
 
 AppendRsv(new []{new []{"ABC"}}, "Append.rsv", false);
 
-Console.WriteLine("Done");
-
 CheckTestFiles();
+
+Console.WriteLine("Done");

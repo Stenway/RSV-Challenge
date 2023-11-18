@@ -45,11 +45,11 @@ func EncodeRsv(rows [][]NullableString) ([]byte, error) {
 }
 
 func DecodeRsv(bytes []byte) ([][]NullableString, error) {
-	result := [][]NullableString{}
-	currentRow := []NullableString{}
 	if len(bytes) > 0 && bytes[len(bytes)-1] != 0xFD {
 		return nil, errors.New("Incomplete RSV document")
 	}
+	result := [][]NullableString{}
+	currentRow := []NullableString{}
 	valueStartIndex := 0
 	for i := 0; i < len(bytes); i++ {
 		if bytes[i] == 0xFF {

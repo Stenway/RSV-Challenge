@@ -46,13 +46,13 @@ class Rsv {
 	}
 	
 	static String[][] decodeRsv(byte[] bytes) {
+		if (bytes.length > 0 && (bytes[bytes.length-1] & 0xFF) != 0xFD) { throw new RuntimeException("Incomplete RSV document"); }
 		CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder();
 		decoder.onMalformedInput(CodingErrorAction.REPORT);
 		decoder.onUnmappableCharacter(CodingErrorAction.REPORT);
 		ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
 		ArrayList<String[]> result = new ArrayList<String[]>();
 		ArrayList<String> currentRow = new ArrayList<String>();
-		if (bytes.length > 0 && (bytes[bytes.length-1] & 0xFF) != 0xFD) { throw new RuntimeException("Incomplete RSV document"); }
 		int valueStartIndex = 0;
 		for (int i=0; i<bytes.length; i++) {
 			int currentByte = bytes[i] & 0xFF;

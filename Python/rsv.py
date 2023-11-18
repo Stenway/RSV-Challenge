@@ -14,10 +14,10 @@ def encode_rsv(rows: list[list[str | None]]) -> bytes:
 	return b"".join(parts)
 
 def decode_rsv(bytes: bytes) -> list[list[str | None]]:
-	result: list[list[str | None]] = []
-	current_row: list[str | None] = []
 	if len(bytes) > 0 and bytes[-1] != 0xFD:
 		raise Exception("Incomplete RSV document")
+	result: list[list[str | None]] = []
+	current_row: list[str | None] = []
 	value_start_index = 0
 	for i in range(len(bytes)):
 		if bytes[i] == 0xFF:

@@ -27,10 +27,10 @@ export function encodeRsv(rows: (string | null)[][]): Uint8Array {
 }
 
 export function decodeRsv(bytes: Uint8Array): (string | null)[][] {
+	if (bytes.length > 0 && bytes[bytes.length-1] != 0xFD) { throw new Error("Incomplete RSV document"); }
 	const decoder = new TextDecoder("utf-8", {fatal: true, ignoreBOM: true});
 	const result: (string | null)[][] = [];
 	let currentRow: (string | null)[] = [];
-	if (bytes.length > 0 && bytes[bytes.length-1] != 0xFD) { throw new Error("Incomplete RSV document"); }
 	let valueStartIndex = 0;
 	for (let i=0; i<bytes.length; i++) {
 		if (bytes[i] == 0xFF) {

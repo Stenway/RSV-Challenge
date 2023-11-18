@@ -28,10 +28,10 @@ static byte[] EncodeRsv(string?[][] rows) {
 }
 
 static string?[][] DecodeRsv(byte[] bytes) {
+	if (bytes.Length > 0 && bytes[bytes.Length-1] != 0xFD) { throw new Exception("Incomplete RSV document"); }
 	var decoder = new UTF8Encoding(false, true);
 	var result = new List<string?[]>();
 	var currentRow = new List<string?>();
-	if (bytes.Length > 0 && bytes[bytes.Length-1] != 0xFD) { throw new Exception("Incomplete RSV document"); }
 	int valueStartIndex = 0;
 	for (int i=0; i<bytes.Length; i++) {
 		if (bytes[i] == 0xFF) {

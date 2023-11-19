@@ -254,6 +254,8 @@ class Rsv {
 			appendRsv(new String[][]{{"ABC"}}, "Append.rsv", true);
 			
 			checkTestFiles(stdout);
+			
+			stdout.println("Done");
 		} catch(Exception e) {
 			System.out.println(e.toString());
 		}

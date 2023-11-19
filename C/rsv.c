@@ -405,9 +405,9 @@ Rows* loadRsv(char* filePath) {
 bool appendRsv(Rows* rows, char* filePath, bool continueLastRow) {
 	FILE* file = fopen(filePath, "rb+");
 	if (file == NULL) {
-        file = fopen(filePath, "wb+");
+		file = fopen(filePath, "wb+");
 		if (file == NULL) { return false; }
-    }
+	}
 	fseek(file, 0, SEEK_END);
 	long fileSize = ftell(file);
 	if (continueLastRow && fileSize > 0) {

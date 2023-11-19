@@ -93,8 +93,8 @@ class Rsv {
 	}
 	
 	static void appendRsv(String[][] rows, String filePath, boolean continueLastRow) throws IOException {
-	   	RandomAccessFile file = new RandomAccessFile(filePath, "rw");
-	   	try {
+		RandomAccessFile file = new RandomAccessFile(filePath, "rw");
+		try {
 			if (continueLastRow && file.length() > 0) {
 				file.seek(file.length() - 1);
 				if ((file.readByte() & 0xFF) != 0xFD) { throw new RuntimeException("Incomplete RSV document"); }

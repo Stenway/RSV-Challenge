@@ -1,0 +1,6 @@
+﻿*.rsv
+*.exe
+*.o
+*.lps
+backup
+lib

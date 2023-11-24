@@ -94,8 +94,8 @@ static IEnumerable<byte[]> SplitBytes(byte[] bytes, byte splitByte) {
 }
 
 static string?[][] DecodeRsvUsingSplit(byte[] bytes) {
-	var decoder = new UTF8Encoding(true, true);
 	if (bytes.LastOrDefault((byte)0xFD) != 0xFD) { throw new Exception("Incomplete RSV document"); }
+	var decoder = new UTF8Encoding(true, true);
 	return SplitBytes(bytes, 0xFD).SkipLast(1).Select(
 		(rowBytes) => {
 			if (rowBytes.LastOrDefault((byte)0xFF) != 0xFF) { throw new Exception("Incomplete RSV row"); }

@@ -354,7 +354,7 @@ pub fn main() !void {
 
     try appendRsv(append_rows, "Append.rsv", true, allocator);
 
-    //try checkTestFiles(allocator);
+    try checkTestFiles(allocator);
 
     std.debug.print("Done", .{});
 }

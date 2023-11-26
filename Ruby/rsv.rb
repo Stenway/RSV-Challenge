@@ -180,6 +180,7 @@ def append_rsv(rows, file_path, continue_last_row)
 		end
 		if rows.empty?
 			file.close
+			return
 		end
 		file.seek(file_size - 1, IO::SEEK_SET)
 	end

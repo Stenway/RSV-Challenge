@@ -120,6 +120,7 @@ function appendRsv(array $rows, string $filePath, bool $continueLastRow = false)
 			throw new RuntimeException("Incomplete RSV document");
 		}
 		if (count($rows) == 0) {
+			if (fclose($file) === false) { throw new \Exception("Could not close file handle"); }
 			return;
 		}
 		fseek($file, -1, SEEK_END);

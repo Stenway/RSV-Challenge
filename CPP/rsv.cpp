@@ -200,6 +200,7 @@ void appendRsv(vector<vector<optional<string>>>& rows, string filePath, bool con
 		}
 		if (rows.size() == 0) {
 			fclose(file);
+			return;
 		}
 		fseek(file, fileSize - 1, SEEK_SET);
 	}

@@ -186,6 +186,7 @@ function appendRsv(rows, filePath, continueLastRow)
 		end
 		if #rows == 0 then
 			file:close()
+			return
 		end
 		file:seek("set", fileSize - 1)
 	end

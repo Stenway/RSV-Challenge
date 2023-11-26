@@ -193,6 +193,7 @@ function appendRsv(rows, filePath, continueLastRow)
     end
     if isempty(rows)
       fclose(file);
+      return;
     end
     fseek(file, fileSize - 1, "bof");
   end

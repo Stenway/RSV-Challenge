@@ -284,6 +284,7 @@ Rows* decodeRsv(Bytes bytes) {
 			valueStartIndex = i+1;
 		}
 	}
+	deleteRow(currentRow);
 	if (errorOccurred) {
 		deleteRows(result);
 		return NULL;

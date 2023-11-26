@@ -115,6 +115,29 @@ fn load_rsv(file_path string) ![][]?string {
 	return decode_rsv(bytes)
 }
 
+fn append_rsv(rows [][]?string, file_path string, continue_last_row bool) ! {
+	bytes := encode_rsv(rows)!
+	mut file := os.open_file(file_path, 'rb+') or {
+		os.open_file(file_path, 'wb+')!
+	}
+	file.seek(0, .end)!
+	file_size := file.tell()!
+	if continue_last_row && file_size > 0 {
+		last_byte := file.read_bytes_at(1, u64(file_size - 1))
+		if last_byte[0] != 0xFD {
+			file.close()
+			return error('Incomplete RSV document')
+		}
+		if rows.len == 0 {
+			file.close()
+			return
+		}
+		file.seek(file_size - 1, .start)!
+	}
+	file.write(bytes)!
+	file.close()
+}
+
 // ----------------------------------------------------------------------
 
 fn escape_json_string(str string, mut builder strings.Builder) {
@@ -235,6 +258,12 @@ fn main() {
 	loaded_rows := load_rsv('Test.rsv')!
 	println(rsv_to_json_string(loaded_rows))
 	save_rsv(loaded_rows, 'TestResaved.rsv')!
+	
+	mut append_rows := [][]?string{}
+	mut append_row1 := []?string{}
+	append_row1 << 'ABC'
+	append_rows << append_row1
+	append_rsv(append_rows, 'Append.rsv', true)!
 	
 	check_test_files()!
 	

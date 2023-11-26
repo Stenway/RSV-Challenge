@@ -173,6 +173,28 @@ namespace Rsv
 			return DecodeRsv(bytes);
 		}
 
+		static Result<void> AppendRsv(List<List<String>> rows, String filePath, bool continueLastRow) {
+			switch (EncodeRsv(rows)) {
+			case .Ok(let bytes): {
+				defer delete bytes;
+				FileStream fileStream = new FileStream();
+				defer delete fileStream;
+				defer fileStream.Close();
+				fileStream.Open(filePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+				if (continueLastRow && fileStream.Length > 0) {
+					fileStream.Position = fileStream.Length - 1;
+					if (fileStream.Peek<uint8>() != 0xFD) { return .Err; }
+					if (rows.Count == 0) return .Ok;
+				} else {
+					fileStream.Position = fileStream.Length;
+				}
+				fileStream.Write(bytes.GetRange(0, bytes.Count));
+			}
+			case .Err: return .Err;
+			}
+			return .Ok;
+		}
+
 		// ----------------------------------------------------------------------
 
 		static void EscapeJsonString(String value, String result) {
@@ -306,6 +328,13 @@ namespace Rsv
 
 				SaveRsv(loadedRows, "TestResaved.rsv");
 			}
+
+			var appendRows = new List<List<String>>();
+			defer DeleteRows(appendRows);
+			var appendRow1 = new List<String>(String[] ("ABC"));
+			appendRows.Add(appendRow1);
+
+			AppendRsv(appendRows, "Append.rsv", false);
 
 			CheckTestFiles();
 

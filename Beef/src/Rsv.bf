@@ -7,8 +7,8 @@ using System.Text;
 
 namespace Rsv
 {
-    class Program
-    {
+	class Program
+	{
 		static uint8[256] utf8ByteClassLookup = .(
 			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -283,8 +283,8 @@ namespace Rsv
 
 		// ----------------------------------------------------------------------
 
-        static void Main()
-        {
+		static void Main()
+		{
 			var rows = new List<List<String>>();
 			defer DeleteRows(rows);
 			var row1 = new List<String>(String[] ("Hello", "🌎", null, ""));
@@ -310,6 +310,6 @@ namespace Rsv
 			CheckTestFiles();
 
 			Console.WriteLine("Done");
-        }
-    }
+		}
+	}
 }

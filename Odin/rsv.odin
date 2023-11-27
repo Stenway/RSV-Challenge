@@ -127,6 +127,75 @@ load_rsv :: proc(file_path: string) -> ([dynamic][dynamic]Maybe(string), bool) {
 	return rows, true
 }
 
+append_rsv :: proc(rows: [dynamic][dynamic]Maybe(string), file_path: string, continue_last_row: bool) -> bool {
+	bytes, error := encode_rsv(rows)
+	defer delete(bytes, context.allocator)
+	if error != nil { return false }
+	
+	file, ferror := os.open(file_path, os.O_RDWR | os.O_CREATE)
+	if ferror > 0 { return false }
+	file_size, ferror2 := os.file_size(file)
+	if ferror2 > 0 { return false }
+	if continue_last_row && file_size > 0 {
+		os.seek(file, file_size - 1, 0)
+		buffer := []u8{0}
+		os.read(file, buffer)
+		if buffer[0] != 0xFD {
+			return false
+		}
+		os.seek(file, file_size - 1, 0)
+	} else {
+		os.seek(file, file_size, 0)
+	}
+	os.write(file, bytes)
+	os.close(file)
+	return true
+}
+
+// ----------------------------------------------------------------------
+
+escape_json_string :: proc(str: string) -> string {
+	builder := [dynamic]string{}
+	append(&builder, "\"")
+	for ch in str {
+		c := int(ch)
+		if c == 0x08 { append(&builder, "\\b") }
+		else if c == 0x09 { append(&builder, "\\t") }
+		else if c == 0x0A { append(&builder, "\\n") }
+		else if c == 0x0C { append(&builder, "\\f") }
+		else if c == 0x0D { append(&builder, "\\r") }
+		else if c == 0x22 { append(&builder, "\\\"") }
+		else if c == 0x5C { append(&builder, "\\\\") }
+		else if c >= 0x00 && c <= 0x1F { append(&builder, fmt.aprintf("\\u%04x", c)) }
+		else { append(&builder, fmt.aprintf("%c", ch)) }
+	}
+	append(&builder, "\"")
+	return strings.join(builder[:], "")
+}
+
+rsv_to_json_string :: proc(rows: [dynamic][dynamic]Maybe(string)) -> string {
+	builder := [dynamic]string{}
+	append(&builder, "[")
+	is_first_row := true
+	for row in rows {
+		if !is_first_row { append(&builder, ",") }
+		is_first_row = false
+		append(&builder, "\n  [")
+		is_first_value := true
+		for value in row {
+			if !is_first_value { append(&builder, ", ") }
+			is_first_value = false
+			if value == nil { append(&builder, "null") }
+			else {
+				append(&builder, escape_json_string(value.?))
+			}
+		}
+		append(&builder, "]")
+	}
+	append(&builder, "\n]")
+	return strings.join(builder[:], "")
+}
+
 // ----------------------------------------------------------------------
 
 check_test_files :: proc() {
@@ -137,6 +206,14 @@ check_test_files :: proc() {
 		loaded_rows, success := load_rsv(file_path_rsv)
 		if success == false {
 			panic("Could not load")
+		}
+		json_str := rsv_to_json_string(loaded_rows)
+		
+		file_path_json := fmt.tprintf("./../TestFiles/Valid_%3d.json", i)
+		loaded_json_bytes, _ := os.read_entire_file_from_filename(file_path_json)
+		loaded_json_str := string(loaded_json_bytes)
+		if strings.compare(json_str, loaded_json_str) != 0 {
+			panic("JSON mismatch")
 		}
 		
 		bytes, _ := os.read_entire_file_from_filename(file_path_rsv)
@@ -174,7 +251,7 @@ main :: proc() {
 		[dynamic]Maybe(string){},
 		[dynamic]Maybe(string){""},
 	}
-	fmt.println(rows)
+	fmt.println(rsv_to_json_string(rows))
 	
 	//bytes, _ := encode_rsv(rows)
 	//fmt.println(bytes)
@@ -184,9 +261,14 @@ main :: proc() {
 	
 	save_rsv(rows, "Test.rsv")
 	loaded_rows, _ := load_rsv("Test.rsv")
-	fmt.println(loaded_rows)
+	fmt.println(rsv_to_json_string(loaded_rows))
 	
 	save_rsv(loaded_rows, "TestResaved.rsv")
+	
+	append_rows := [dynamic][dynamic]Maybe(string){
+		[dynamic]Maybe(string){"ABC"},
+	}
+	append_rsv(append_rows, "Append.rsv", false)
 	
 	check_test_files()
 	

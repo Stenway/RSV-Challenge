@@ -139,18 +139,6 @@ List<List<String?>> loadRsvSync(String filePath) {
 	return decodeRsv(File(filePath).readAsBytesSync());
 }
 
-// ----------------------------------------------------------------------
-
-String rsvToJson(List<List<String?>>rows) {
-	return "[" + (rows.length > 0 ? "\n" : "") + rows.map(
-		(row) {
-			return "  [" + row.map((x) => jsonEncode(x)).join(", ") + "]";
-		}
-	).join(",\n") + "\n]";
-}
-
-// ----------------------------------------------------------------------
-
 void appendRsvSync(List<List<String?>> rows, String filePath, bool continueLastRow) {
 	RandomAccessFile file = File(filePath).openSync(mode: FileMode.append);
 	try {
@@ -168,6 +156,16 @@ void appendRsvSync(List<List<String?>> rows, String filePath, bool continueLastR
 	} finally {
 		file.closeSync();
 	}
+}
+
+// ----------------------------------------------------------------------
+
+String rsvToJson(List<List<String?>>rows) {
+	return "[" + (rows.length > 0 ? "\n" : "") + rows.map(
+		(row) {
+			return "  [" + row.map((x) => jsonEncode(x)).join(", ") + "]";
+		}
+	).join(",\n") + "\n]";
 }
 
 // ----------------------------------------------------------------------

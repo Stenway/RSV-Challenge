@@ -1,3 +1,5 @@
+/* (C) Stefan John / Stenway / Stenway.com / 2023 */
+
 import java.io.PrintWriter
 import java.io.OutputStreamWriter
 import java.nio.charset.{CharsetDecoder, CodingErrorAction}

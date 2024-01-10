@@ -4,25 +4,25 @@
 
 import * as fs from 'node:fs'
 import * as bf from 'node:buffer'
-import { decodeRsv, encodeRsv } from './rsv.ts'
+import { decodeXRsv, encodeXRsv } from './xrsv.ts'
 
-export function saveRsvSync(rows: (string | null)[][], filePath: string) {
-	fs.writeFileSync(filePath, encodeRsv(rows));
+export function saveXRsvSync(rows: (string | null)[][], filePath: string) {
+	fs.writeFileSync(filePath, encodeXRsv(rows));
 }
 
-export async function saveRsv(rows: (string | null)[][], filePath: string) {
-	await fs.promises.writeFile(filePath, encodeRsv(rows));
+export async function saveXRsv(rows: (string | null)[][], filePath: string) {
+	await fs.promises.writeFile(filePath, encodeXRsv(rows));
 }
 
-export function loadRsvSync(filePath: string): (string | null)[][] {
-	return decodeRsv(fs.readFileSync(filePath));
+export function loadXRsvSync(filePath: string): (string | null)[][] {
+	return decodeXRsv(fs.readFileSync(filePath));
 }
 
-export async function loadRsv(filePath: string): Promise<(string | null)[][]> {
-	return decodeRsv(await fs.promises.readFile(filePath));
+export async function loadXRsv(filePath: string): Promise<(string | null)[][]> {
+	return decodeXRsv(await fs.promises.readFile(filePath));
 }
 
-export function appendRsvSync(rows: (string | null)[][], filePath: string, continueLastRow: boolean = false) {
+export function appendXRsvSync(rows: (string | null)[][], filePath: string, continueLastRow: boolean = false) {
 	let handle: number;
 	let existed = false;
 	try {
@@ -42,18 +42,18 @@ export function appendRsvSync(rows: (string | null)[][], filePath: string, conti
 			position = size - 1;
 			const buffer = bf.Buffer.alloc(1)
 			if (fs.readSync(handle, buffer, 0, 1, position) !== 1) { throw new Error(`Reading last byte failed`); }
-			if (buffer[0] !== 0xFD) { throw new Error("Incomplete RSV document"); }
+			if (buffer[0] !== 0xFD) { throw new Error("Incomplete XRSV document"); }
 		} else {
 			position = size;
 		}
-		const bytes = encodeRsv(rows);
+		const bytes = encodeXRsv(rows);
 		if (fs.writeSync(handle, bytes, 0, bytes.length, position) !== bytes.length) { throw new Error(`Data not fully written`); }
 	} finally {
 		fs.closeSync(handle);
 	}
 }
 
-export async function appendRsv(rows: (string | null)[][], filePath: string, continueLastRow: boolean = false) {
+export async function appendXRsv(rows: (string | null)[][], filePath: string, continueLastRow: boolean = false) {
 	let handle: fs.promises.FileHandle;
 	let existed = false;
 	try {
@@ -73,11 +73,11 @@ export async function appendRsv(rows: (string | null)[][], filePath: string, con
 			position = size - 1;
 			const buffer = bf.Buffer.alloc(1)
 			if ((await handle.read(buffer, 0, 1, position)).bytesRead !== 1) { throw new Error(`Reading last byte failed`); }
-			if (buffer[0] !== 0xFD) { throw new Error("Incomplete RSV document"); }
+			if (buffer[0] !== 0xFD) { throw new Error("Incomplete XRSV document"); }
 		} else {
 			position = size;
 		}
-		const bytes = encodeRsv(rows);
+		const bytes = encodeXRsv(rows);
 		if ((await handle.write(bytes, 0, bytes.length, position)).bytesWritten !== bytes.length) { throw new Error(`Data not fully written`); }
 	} finally {
 		await handle.close(); 

@@ -152,13 +152,13 @@ export function getInvalidTestCases(): number[][] {
 	const A = 0x41
 	
 	return [
-		// -- incomplete RSV document --
+		// -- incomplete XRSV document --
 		
 		[ValueEnd],
 		[A, ValueEnd],
 		[NullValue, ValueEnd],
 		
-		// -- incomplete RSV line --
+		// -- incomplete XRSV line --
 		
 		[A, RowEnd],
 		

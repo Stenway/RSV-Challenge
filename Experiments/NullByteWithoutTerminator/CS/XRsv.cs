@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.IO;
 
-static byte[] EncodeRsv(string?[][] rows) {
+static byte[] EncodeXRsv(string?[][] rows) {
 	var parts = new List<byte[]>();
 	var valueTerminatorByte = new byte[]{0xFF};
 	var nullValueByte = new byte[]{0xFE};
@@ -29,8 +29,8 @@ static byte[] EncodeRsv(string?[][] rows) {
 	return result;
 }
 
-static string?[][] DecodeRsv(byte[] bytes) {
-	if (bytes.Length > 0 && bytes[bytes.Length-1] != 0xFD) { throw new Exception("Incomplete RSV document"); }
+static string?[][] DecodeXRsv(byte[] bytes) {
+	if (bytes.Length > 0 && bytes[bytes.Length-1] != 0xFD) { throw new Exception("Incomplete XRSV document"); }
 	var decoder = new UTF8Encoding(false, true);
 	var result = new List<string?[]>();
 	var currentRow = new List<string?>();
@@ -48,7 +48,7 @@ static string?[][] DecodeRsv(byte[] bytes) {
 			currentRow.Add(null);
 			valueStartIndex = i+1;
 		} else if (bytes[i] == 0xFD) {
-			if (i > 0 && valueStartIndex != i) { throw new Exception("Incomplete RSV row"); }
+			if (i > 0 && valueStartIndex != i) { throw new Exception("Incomplete XRSV row"); }
 			result.Add(currentRow.ToArray());
 			currentRow.Clear();
 			valueStartIndex = i+1;
@@ -59,31 +59,31 @@ static string?[][] DecodeRsv(byte[] bytes) {
 
 // ----------------------------------------------------------------------
 
-static void SaveRsv(string?[][] rows, string filePath) {
-	File.WriteAllBytes(filePath, EncodeRsv(rows));
+static void SaveXRsv(string?[][] rows, string filePath) {
+	File.WriteAllBytes(filePath, EncodeXRsv(rows));
 }
 
-static string?[][] LoadRsv(string filePath) {
-	return DecodeRsv(File.ReadAllBytes(filePath));
+static string?[][] LoadXRsv(string filePath) {
+	return DecodeXRsv(File.ReadAllBytes(filePath));
 }
 
-static void AppendRsv(string?[][] rows, string filePath, bool continueLastRow = false) {
+static void AppendXRsv(string?[][] rows, string filePath, bool continueLastRow = false) {
 	using (FileStream fileStream = File.Open(filePath, FileMode.OpenOrCreate, FileAccess.ReadWrite)) {
 		if (continueLastRow && fileStream.Length > 0) {
 			fileStream.Position = fileStream.Length - 1;
-			if (fileStream.ReadByte() != 0xFD) { throw new Exception("Incomplete RSV document"); }
+			if (fileStream.ReadByte() != 0xFD) { throw new Exception("Incomplete XRSV document"); }
 			if (rows.Length == 0) return;
 			fileStream.Position = fileStream.Length - 1;
 		} else {
 			fileStream.Position = fileStream.Length;
 		}
-		fileStream.Write(EncodeRsv(rows));
+		fileStream.Write(EncodeXRsv(rows));
 	}
 }
 
 // ----------------------------------------------------------------------
 
-static bool IsValidRsv(byte[] bytes) {
+static bool IsValidXRsv(byte[] bytes) {
 	byte[] byteClassLookup = {
 		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -153,12 +153,12 @@ static string EscapeJsonString(string str) {
 	return result.ToString();
 }
 
-static string RsvToJson(string?[][] rows) {
+static string XRsvToJson(string?[][] rows) {
 	return "["+(rows.Length > 0 ? "\n" : "")+String.Join(",\n", rows.Select((row) => "  ["+String.Join(", ", row.Select(x => x == null ? "null" : EscapeJsonString(x)))+"]"))+"\n]";
 }
 
-static void PrintRsvToJson(string?[][] rows) {
-	Console.WriteLine(RsvToJson(rows));
+static void PrintXRsvToJson(string?[][] rows) {
+	Console.WriteLine(XRsvToJson(rows));
 }
 
 // ----------------------------------------------------------------------
@@ -167,15 +167,15 @@ static void CheckTestFiles() {
 	for (var i=1; i<=79; i++) {
 		var filePath = ".\\..\\TestFiles\\Valid_" + i.ToString("D3");
 		Console.WriteLine("Checking valid test file: " + filePath);
-		var loadedRows = LoadRsv(filePath + ".rsv");
-		var jsonStr = RsvToJson(loadedRows);
+		var loadedRows = LoadXRsv(filePath + ".xrsv");
+		var jsonStr = XRsvToJson(loadedRows);
 				
 		var loadedJsonStr = File.ReadAllText(filePath + ".json");
 		if (jsonStr != loadedJsonStr) {
 			throw new Exception("JSON mismatch");
 		}
 		
-		if (!IsValidRsv(File.ReadAllBytes(filePath + ".rsv"))) {
+		if (!IsValidXRsv(File.ReadAllBytes(filePath + ".xrsv"))) {
 			throw new Exception("Validation mismatch");
 		}
 	}
@@ -185,15 +185,15 @@ static void CheckTestFiles() {
 		Console.WriteLine("Checking invalid test file: " + filePath);
 		var wasError = false;
 		try {
-			var loadedRows = LoadRsv(filePath + ".rsv");
+			var loadedRows = LoadXRsv(filePath + ".xrsv");
 		} catch(Exception e) {
 			wasError = true;
 		}
 		if (!wasError) {
-			throw new Exception("RSV document is valid");
+			throw new Exception("XRSV document is valid");
 		}
 		
-		if (IsValidRsv(File.ReadAllBytes(filePath + ".rsv"))) {
+		if (IsValidXRsv(File.ReadAllBytes(filePath + ".xrsv"))) {
 			throw new Exception("Validation mismatch");
 		}
 	}
@@ -210,17 +210,17 @@ string?[][] rows = new []{
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-PrintRsvToJson(rows);
-var bytes = EncodeRsv(rows);
+PrintXRsvToJson(rows);
+var bytes = EncodeXRsv(rows);
 //Console.WriteLine(ByteArrayToString(bytes));
-var decodedRows = DecodeRsv(bytes);
-SaveRsv(rows, "Test.rsv");
+var decodedRows = DecodeXRsv(bytes);
+SaveXRsv(rows, "Test.xrsv");
 
-var loadedRows = LoadRsv("Test.rsv");
-PrintRsvToJson(loadedRows);
-SaveRsv(loadedRows, "TestResaved.rsv");
+var loadedRows = LoadXRsv("Test.xrsv");
+PrintXRsvToJson(loadedRows);
+SaveXRsv(loadedRows, "TestResaved.xrsv");
 
-AppendRsv(new []{new []{"ABC"}}, "Append.rsv", false);
+AppendXRsv(new []{new []{"ABC"}}, "Append.xrsv", false);
 
 CheckTestFiles();
 

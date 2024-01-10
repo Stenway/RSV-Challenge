@@ -3,7 +3,7 @@
 import json
 import os
 
-def encode_rsv(rows: list[list[str | None]]) -> bytes:
+def encode_xrsv(rows: list[list[str | None]]) -> bytes:
 	parts: list[bytes] = []
 	for row in rows:
 		for value in row:
@@ -14,9 +14,9 @@ def encode_rsv(rows: list[list[str | None]]) -> bytes:
 		parts.append(b"\xFD")
 	return b"".join(parts)
 
-def decode_rsv(bytes: bytes) -> list[list[str | None]]:
+def decode_xrsv(bytes: bytes) -> list[list[str | None]]:
 	if len(bytes) > 0 and bytes[-1] != 0xFD:
-		raise Exception("Incomplete RSV document")
+		raise Exception("Incomplete XRSV document")
 	result: list[list[str | None]] = []
 	current_row: list[str | None] = []
 	value_start_index = 0
@@ -34,7 +34,7 @@ def decode_rsv(bytes: bytes) -> list[list[str | None]]:
 			value_start_index = i + 1
 		elif bytes[i] == 0xFD:
 			if i > 0 and value_start_index != i:
-				raise Exception("Incomplete RSV row")
+				raise Exception("Incomplete XRSV row")
 			result.append(current_row)
 			current_row = []
 			value_start_index = i + 1
@@ -42,15 +42,15 @@ def decode_rsv(bytes: bytes) -> list[list[str | None]]:
 
 # ----------------------------------------------------------------------
 
-def save_rsv(rows: list[list[str | None]], file_path: str):
+def save_xrsv(rows: list[list[str | None]], file_path: str):
 	with open(file_path, "wb") as file:
-		file.write(encode_rsv(rows))
+		file.write(encode_xrsv(rows))
 
-def load_rsv(file_path: str) -> list[list[str | None]]:
+def load_xrsv(file_path: str) -> list[list[str | None]]:
 	with open(file_path, "rb") as file:
-		return decode_rsv(file.read())
+		return decode_xrsv(file.read())
 
-def append_rsv(rows: list[list[str | None]], file_path: str, continue_last_row: bool=False):
+def append_xrsv(rows: list[list[str | None]], file_path: str, continue_last_row: bool=False):
 	try:
 		file = open(file_path, "rb+")
 	except FileNotFoundError as e:
@@ -60,16 +60,16 @@ def append_rsv(rows: list[list[str | None]], file_path: str, continue_last_row: 
 		if continue_last_row and file.tell() > 0:
 			file.seek(-1, os.SEEK_END)
 			if file.read(1) != b'\xFD':
-				raise Exception("Incomplete RSV document")
+				raise Exception("Incomplete XRSV document")
 			if len(rows) == 0:
 				return
 			file.seek(-1, os.SEEK_END)
-		file.write(encode_rsv(rows))
+		file.write(encode_xrsv(rows))
 	finally: file.close()
 
 # ----------------------------------------------------------------------
 
-def is_valid_rsv(bytes: bytes):
+def is_valid_xrsv(bytes: bytes):
 	byte_class_lookup = [
 		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -113,7 +113,7 @@ def is_valid_rsv(bytes: bytes):
 
 # ----------------------------------------------------------------------
 
-def rsv_to_json(rows: list[list[str | None]]) -> str:
+def xrsv_to_json(rows: list[list[str | None]]) -> str:
 	result = "["
 	if len(rows) > 0:
 		result += "\n"
@@ -131,13 +131,13 @@ def check_test_files():
 	for i in range(1, 80):
 		file_path = ".\\..\\TestFiles\\Valid_" + str(i).zfill(3)
 		print("Checking valid test file: " + file_path)
-		loaded_rows = load_rsv(file_path + ".rsv")
-		json_str = rsv_to_json(loaded_rows)
+		loaded_rows = load_xrsv(file_path + ".xrsv")
+		json_str = xrsv_to_json(loaded_rows)
 		loaded_json_str = load_file(file_path + ".json").decode()
 		if json_str != loaded_json_str:
 			raise Exception("JSON mismatch")
 		
-		if not is_valid_rsv(load_file(file_path + ".rsv")):
+		if not is_valid_xrsv(load_file(file_path + ".xrsv")):
 			raise Exception("Validation mismatch")
 	
 	for i in range(1, 29):
@@ -145,12 +145,12 @@ def check_test_files():
 		print("Checking invalid test file: " + file_path)
 		was_error = False
 		try:
-			loaded_rows = load_rsv(file_path + ".rsv")
+			loaded_rows = load_xrsv(file_path + ".xrsv")
 		except Exception as e:
 			was_error = True
 		if not was_error:
-			raise Exception("RSV document is valid")
-		if is_valid_rsv(load_file(file_path + ".rsv")):
+			raise Exception("XRSV document is valid")
+		if is_valid_xrsv(load_file(file_path + ".xrsv")):
 			raise Exception("Validation mismatch")
 
 # ----------------------------------------------------------------------
@@ -158,18 +158,18 @@ def check_test_files():
 def main():
 	print("------------")
 	rows = [["Hello", "🌎", None, ""], ["A\0B\nC", "Test 𝄞"], [], [""]]
-	print(rsv_to_json(rows))
+	print(xrsv_to_json(rows))
 	
-	encoded_bytes = encode_rsv(rows)
-	decoded = decode_rsv(encoded_bytes)
+	encoded_bytes = encode_xrsv(rows)
+	decoded = decode_xrsv(encoded_bytes)
 	
-	save_rsv(rows, "Test.rsv")
-	loaded = load_rsv("Test.rsv")
-	print(rsv_to_json(loaded))
+	save_xrsv(rows, "Test.xrsv")
+	loaded = load_xrsv("Test.xrsv")
+	print(xrsv_to_json(loaded))
 	
-	save_rsv(loaded, "TestResaved.rsv")
+	save_xrsv(loaded, "TestResaved.xrsv")
 	
-	#append_rsv([["ABC"]], "Append.rsv", True)
+	#append_xrsv([["ABC"]], "Append.xrsv", True)
 	
 	check_test_files()
 	

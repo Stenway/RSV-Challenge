@@ -1,7 +1,7 @@
 ﻿/* (C) Stefan John / Stenway / Stenway.com / 2023 */
 
-import { rsvToJson } from "./rsv-conv.ts"
-import { appendRsvSync, loadRsvSync, saveRsvSync } from "./rsv-io.ts"
+import { xrsvToJson } from "./xrsv-conv.ts"
+import { appendXRsvSync, loadXRsvSync, saveXRsvSync } from "./xrsv-io.ts"
 
 const rows = [
 	["Hello", "🌎", null, ""],
@@ -10,27 +10,27 @@ const rows = [
 	[""]
 ]
 
-saveRsvSync(rows, "Test.rsv")
-console.log("RSV")
+saveXRsvSync(rows, "Test.xrsv")
+console.log("XRSV")
 console.log("---")
-console.log(rsvToJson(rows))
+console.log(xrsvToJson(rows))
 
-const loadedRows = loadRsvSync("Test.rsv")
-console.log("\nLoaded RSV")
+const loadedRows = loadXRsvSync("Test.xrsv")
+console.log("\nLoaded XRSV")
 console.log("----------")
-console.log(rsvToJson(loadedRows))
+console.log(xrsvToJson(loadedRows))
 
-saveRsvSync(loadedRows, "TestResaved.rsv")
+saveXRsvSync(loadedRows, "TestResaved.xrsv")
 /*
 console.log("\nXML")
 console.log("---")
-console.log(rsvToXml(rows))
+console.log(xrsvToXml(rows))
 
 console.log("\nSML")
 console.log("---")
-console.log(rsvToSml(rows))
+console.log(xrsvToSml(rows))
 console.log("# Warning: with Chrome console.log replaces the NUL character with a space")
 */
-//appendRsvSync([["ABC"]], "Append.rsv", false)
+//appendXRsvSync([["ABC"]], "Append.xrsv", false)
 
 console.log("Done")

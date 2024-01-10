@@ -22,7 +22,7 @@ func Null() NullableString          { return NullableString{IsNull: true} }
 
 // ----------------------------------------------------------------------
 
-func EncodeRsv(rows [][]NullableString) ([]byte, error) {
+func EncodeXRsv(rows [][]NullableString) ([]byte, error) {
 	parts := [][]byte{}
 	valueTerminatorByte := []byte{0xFF}
 	nullValueByte := []byte{0xFE}
@@ -46,9 +46,9 @@ func EncodeRsv(rows [][]NullableString) ([]byte, error) {
 	return bytes.Join(parts, nil), nil
 }
 
-func DecodeRsv(bytes []byte) ([][]NullableString, error) {
+func DecodeXRsv(bytes []byte) ([][]NullableString, error) {
 	if len(bytes) > 0 && bytes[len(bytes)-1] != 0xFD {
-		return nil, errors.New("Incomplete RSV document")
+		return nil, errors.New("Incomplete XRSV document")
 	}
 	result := [][]NullableString{}
 	currentRow := []NullableString{}
@@ -71,7 +71,7 @@ func DecodeRsv(bytes []byte) ([][]NullableString, error) {
 			valueStartIndex = i + 1
 		} else if bytes[i] == 0xFD {
 			if i > 0 && valueStartIndex != i {
-				return nil, errors.New("Incomplete RSV row")
+				return nil, errors.New("Incomplete XRSV row")
 			}
 			result = append(result, currentRow)
 			currentRow = []NullableString{}
@@ -83,23 +83,23 @@ func DecodeRsv(bytes []byte) ([][]NullableString, error) {
 
 // ----------------------------------------------------------------------
 
-func SaveRsv(rows [][]NullableString, filePath string, permissions os.FileMode) error {
-	bytes, err := EncodeRsv(rows)
+func SaveXRsv(rows [][]NullableString, filePath string, permissions os.FileMode) error {
+	bytes, err := EncodeXRsv(rows)
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(filePath, bytes, permissions)
 }
 
-func LoadRsv(filePath string) ([][]NullableString, error) {
+func LoadXRsv(filePath string) ([][]NullableString, error) {
 	bytes, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
-	return DecodeRsv(bytes)
+	return DecodeXRsv(bytes)
 }
 
-func AppendRsv(rows [][]NullableString, filePath string, permissions os.FileMode, continueLastRow bool) error {
+func AppendXRsv(rows [][]NullableString, filePath string, permissions os.FileMode, continueLastRow bool) error {
 	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, permissions)
 	if err != nil {
 		return err
@@ -118,7 +118,7 @@ func AppendRsv(rows [][]NullableString, filePath string, permissions os.FileMode
 			return err
 		}
 		if b[0] != 0xFD {
-			return errors.New("Incomplete RSV document")
+			return errors.New("Incomplete XRSV document")
 		}
 		if len(rows) == 0 {
 			return nil
@@ -131,7 +131,7 @@ func AppendRsv(rows [][]NullableString, filePath string, permissions os.FileMode
 			return err
 		}
 	}
-	bytes, err := EncodeRsv(rows)
+	bytes, err := EncodeXRsv(rows)
 	if err != nil {
 		return err
 	}
@@ -176,7 +176,7 @@ var stateTransitionLookup = []byte{
 	0, 2, 0, 0, 0, 3, 4, 6, 5, 7, 8, 9, 1, 10, 10,
 }
 
-func IsValidRsv(bytes []byte) bool {
+func IsValidXRsv(bytes []byte) bool {
 	lastState := 1
 	for i := 0; i < len(bytes); i++ {
 		currentByte := bytes[i]
@@ -190,12 +190,12 @@ func IsValidRsv(bytes []byte) bool {
 	return lastState == 1
 }
 
-func IsValidRsvFile(filePath string) (bool, error) {
+func IsValidXRsvFile(filePath string) (bool, error) {
 	bytes, err := os.ReadFile(filePath)
 	if err != nil {
 		return false, err
 	}
-	return IsValidRsv(bytes), nil
+	return IsValidXRsv(bytes), nil
 }
 
 // ----------------------------------------------------------------------
@@ -229,7 +229,7 @@ func EscapeJsonString(str string) string {
 	return result.String()
 }
 
-func RsvToJson(rows [][]NullableString) string {
+func XRsvToJson(rows [][]NullableString) string {
 	var builder strings.Builder
 	builder.WriteString("[")
 	isFirstRow := true
@@ -257,8 +257,8 @@ func RsvToJson(rows [][]NullableString) string {
 	return builder.String()
 }
 
-func PrintRsvToJson(rows [][]NullableString) {
-	fmt.Println(RsvToJson(rows))
+func PrintXRsvToJson(rows [][]NullableString) {
+	fmt.Println(XRsvToJson(rows))
 }
 
 // ----------------------------------------------------------------------
@@ -267,11 +267,11 @@ func CheckTestFiles() {
 	for i := 1; i <= 79; i++ {
 		filePath := fmt.Sprintf("./../TestFiles/Valid_%03d", i)
 		fmt.Println("Checking valid test file:", filePath)
-		loadedRows, err := LoadRsv(filePath + ".rsv")
+		loadedRows, err := LoadXRsv(filePath + ".xrsv")
 		if err != nil {
-			panic("Could not load RSV file")
+			panic("Could not load XRSV file")
 		}
-		jsonStr := RsvToJson(loadedRows)
+		jsonStr := XRsvToJson(loadedRows)
 
 		loadedJsonBytes, err := os.ReadFile(filePath + ".json")
 		if err != nil {
@@ -282,9 +282,9 @@ func CheckTestFiles() {
 			panic("JSON mismatch")
 		}
 
-		isValid, err := IsValidRsvFile(filePath + ".rsv")
+		isValid, err := IsValidXRsvFile(filePath + ".xrsv")
 		if err != nil {
-			panic("Could not load RSV file")
+			panic("Could not load XRSV file")
 		}
 		if isValid == false {
 			panic("Validation mismatch")
@@ -294,14 +294,14 @@ func CheckTestFiles() {
 	for i := 1; i <= 28; i++ {
 		filePath := fmt.Sprintf("./../TestFiles/Invalid_%03d", i)
 		fmt.Println("Checking invalid test file:", filePath)
-		_, err := LoadRsv(filePath + ".rsv")
+		_, err := LoadXRsv(filePath + ".xrsv")
 		if err == nil {
-			panic("RSV document is valid")
+			panic("XRSV document is valid")
 		}
 
-		isValid, err := IsValidRsvFile(filePath + ".rsv")
+		isValid, err := IsValidXRsvFile(filePath + ".xrsv")
 		if err != nil {
-			panic("Could not load RSV file")
+			panic("Could not load XRSV file")
 		}
 		if isValid == true {
 			panic("Validation mismatch")
@@ -318,30 +318,30 @@ func main() {
 		{},
 		{Str("")},
 	}
-	PrintRsvToJson(rows)
-	bytes, err := EncodeRsv(rows)
+	PrintXRsvToJson(rows)
+	bytes, err := EncodeXRsv(rows)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Printf("% X\n", string(bytes))
 
-	decodedRows, err := DecodeRsv(bytes)
+	decodedRows, err := DecodeXRsv(bytes)
 	if err != nil {
 		panic(err)
 	}
-	PrintRsvToJson(decodedRows)
+	PrintXRsvToJson(decodedRows)
 
-	err = SaveRsv(rows, "Test.rsv", 0644)
+	err = SaveXRsv(rows, "Test.xrsv", 0644)
 	if err != nil {
 		panic(err)
 	}
-	loadedRows, err := LoadRsv("Test.rsv")
+	loadedRows, err := LoadXRsv("Test.xrsv")
 	if err != nil {
 		panic(err)
 	}
-	PrintRsvToJson(loadedRows)
+	PrintXRsvToJson(loadedRows)
 
-	err = AppendRsv([][]NullableString{{Str("ABC")}}, "Append.rsv", 0644, false)
+	err = AppendXRsv([][]NullableString{{Str("ABC")}}, "Append.xrsv", 0644, false)
 	if err != nil {
 		panic(err)
 	}

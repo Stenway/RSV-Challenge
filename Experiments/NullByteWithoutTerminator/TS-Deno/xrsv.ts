@@ -1,6 +1,6 @@
 ﻿/* (C) Stefan John / Stenway / Stenway.com / 2023 */
 
-export function encodeRsv(rows: (string | null)[][]): Uint8Array {
+export function encodeXRsv(rows: (string | null)[][]): Uint8Array {
 	const parts: Uint8Array[] = [];
 	const valueTerminatorByte = new Uint8Array([0xFF]);
 	const nullValueByte = new Uint8Array([0xFE]);
@@ -28,8 +28,8 @@ export function encodeRsv(rows: (string | null)[][]): Uint8Array {
 	return result;
 }
 
-export function decodeRsv(bytes: Uint8Array): (string | null)[][] {
-	if (bytes.length > 0 && bytes[bytes.length-1] != 0xFD) { throw new Error("Incomplete RSV document"); }
+export function decodeXRsv(bytes: Uint8Array): (string | null)[][] {
+	if (bytes.length > 0 && bytes[bytes.length-1] != 0xFD) { throw new Error("Incomplete XRSV document"); }
 	const decoder = new TextDecoder("utf-8", {fatal: true, ignoreBOM: true});
 	const result: (string | null)[][] = [];
 	let currentRow: (string | null)[] = [];
@@ -47,7 +47,7 @@ export function decodeRsv(bytes: Uint8Array): (string | null)[][] {
 			currentRow.push(null);
 			valueStartIndex = i+1;
 		} else if (bytes[i] == 0xFD) {
-			if (i > 0 && valueStartIndex != i) { throw new Error("Incomplete RSV row"); }
+			if (i > 0 && valueStartIndex != i) { throw new Error("Incomplete XRSV row"); }
 			result.push(currentRow);
 			currentRow = [];
 			valueStartIndex = i+1;
@@ -89,7 +89,7 @@ const stateTransitionLookup = [
 	0, 2, 0, 0, 0, 3, 4, 6, 5, 7, 8, 9, 1, 10, 10
 ]
 
-export function isValidRsv(bytes: Uint8Array): boolean {
+export function isValidXRsv(bytes: Uint8Array): boolean {
 	let lastState = 1;
 	for (let i=0; i<bytes.length; i++) {
 		const currentByte = bytes[i];

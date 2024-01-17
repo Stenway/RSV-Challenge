@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	Types.xcu (Configuration Data File / Registry Update Format)
+	
+	org.openoffice.TypeDetection.Types
+	
+	||	Developer's Guide / Configuration Management / Customizing Configuration Data / Preparing Custom Configuration Data:
+	||	->	https://wiki.openoffice.org/wiki/Documentation/DevGuide/Config/Preparing_a_Custom_Configuration_Schema
+	||	->	https://wiki.documentfoundation.org/Documentation/DevGuide/Configuration_Management#Preparing_Custom_Configuration_Data
+	||
+	||	Developer's Guide / Office Development / Common Application Features / Integrating Import and Export Filters / Type Detection and its Configuration:
+	||	->	https://wiki.openoffice.org/wiki/Documentation/DevGuide/OfficeDev/Configuring_a_Filter_in_OpenOffice.org
+	||	->	https://wiki.documentfoundation.org/Documentation/DevGuide/Office_Development#Type_Detection_and_its_Configuration
+	||
+	||	OpenOffice.org Registry Format (OOR):
+	||	->	https://people.freedesktop.org/~vmiklos/2013/oor-document-format.html
+-->
+<oor:component-data
+	xmlns:oor="http://openoffice.org/2001/registry"
+	xmlns:xs="http://www.w3.org/2001/XMLSchema"
+	
+	oor:package="org.openoffice.TypeDetection"
+	oor:name="Types"
+>
+	<!--
+		Types
+	-->
+	<node
+		oor:name="Types"
+	>
+		<!--
+			StenwayRSVType
+			
+			||	Developer's Guide / Office Development / Common Application Features / Integrating Import and Export Filters / Properties of a Type:
+			||	->	https://wiki.openoffice.org/wiki/Documentation/DevGuide/OfficeDev/Properties_of_a_Type
+			||	->	https://wiki.documentfoundation.org/Documentation/DevGuide/Office_Development#Properties_of_a_Type
+		-->
+		<node
+			oor:name="StenwayRSVType"
+			oor:op="replace"
+		>
+			<prop
+				oor:name="ClipboardFormat"
+			/>
+			<prop
+				oor:name="DetectService"
+			>
+				<value>com.stenway.libreoffice.rsvextension.RsvImportExportFilter</value>
+			</prop>
+			<prop
+				oor:name="Extensions"
+			>
+				<value>rsv</value>
+			</prop>
+			<prop
+				oor:name="MediaType"
+			>
+				<value>application/rsv</value>
+			</prop>
+			<prop
+				oor:name="Preferred"
+			>
+				<value>true</value>
+			</prop>
+			<prop
+				oor:name="PreferredFilter"
+			>
+				<value>StenwayRSVImportExportFilter</value>
+			</prop>
+			<prop
+				oor:name="UIName"
+			>
+				<value xml:lang="en-US">Stenway RSV Type</value>
+			</prop>
+			<prop
+				oor:name="URLPattern"
+			/>
+		</node>
+	</node>
+</oor:component-data>

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	description.xml
+	
+	||	Developer's Guide / Extensions / description.xml:
+	||	->	https://wiki.openoffice.org/wiki/Documentation/DevGuide/Extensions/description.xml
+	||	->	https://wiki.documentfoundation.org/Documentation/DevGuide/Extensions#description.xml
+	||
+	||	Developer's Guide / Extensions / description.xml / Example:
+	||	->	https://wiki.openoffice.org/wiki/Documentation/DevGuide/Extensions/Example
+	||	->	https://wiki.documentfoundation.org/Documentation/DevGuide/Extensions#Example
+-->
+<description
+	xmlns="http://openoffice.org/extensions/description/2006"
+	xmlns:d="http://openoffice.org/extensions/description/2006"
+	xmlns:xlink="http://www.w3.org/1999/xlink"
+>
+	<!--
+		Version
+		
+		||	Developer's Guide / Extensions / Extension Versions:
+		||	->	https://wiki.openoffice.org/wiki/Documentation/DevGuide/Extensions/Extension_Versions
+		||	->	https://wiki.documentfoundation.org/Documentation/DevGuide/Extensions#Extension_Versions_2
+	-->
+	<version
+		value="1.0.0"
+	/>
+	
+	<!--
+		Identifier
+		
+		||	Developer's Guide / Extensions / Extension Identifiers:
+		||	->	https://wiki.openoffice.org/wiki/Documentation/DevGuide/Extensions/Extension_Identifiers
+		||	->	https://wiki.documentfoundation.org/Documentation/DevGuide/Extensions#Extension_Identifiers
+	-->
+	<identifier
+		value="com.stenway.libreoffice.rsvextension"
+	/>
+	
+	<!--
+		Publisher
+		
+		||	Developer's Guide / Extensions / Publisher Information:
+		||	->	https://wiki.openoffice.org/wiki/Documentation/DevGuide/Extensions/Publisher_Information
+		||	->	https://wiki.documentfoundation.org/Documentation/DevGuide/Extensions#Publisher_Information
+	-->
+	<publisher>
+    	<name xlink:href="https://www.stenway.com" lang="en">Stenway</name>
+	</publisher>
+	
+	<!--
+		Display Name
+		
+		||	Developer's Guide / Extensions / Display Name:
+		||	->	https://wiki.openoffice.org/wiki/Documentation/DevGuide/Extensions/Display_Name
+		||	->	https://wiki.documentfoundation.org/Documentation/DevGuide/Extensions#Display_Name
+	-->
+	<display-name>
+		<name lang="en">RSV (Rows of String Values) Importer/Exporter</name>
+	</display-name>
+	
+	<!--
+		Extension Description
+		
+		||	Developer's Guide / Extensions / Extension Description:
+		||	->	https://wiki.openoffice.org/wiki/Documentation/DevGuide/Extensions/Extension_Description
+		||	->	https://wiki.documentfoundation.org/Documentation/DevGuide/Extensions#Extension_Description
+	-->
+	<extension-description>
+    	<src xlink:href="Resources/Description.txt" lang="en"/>
+  	</extension-description>
+	
+	<!--
+		Icon
+		
+		||	Developer's Guide / Extensions / Icon:
+		||	->	https://wiki.openoffice.org/wiki/Documentation/DevGuide/Extensions/Icon
+		||	->	https://wiki.documentfoundation.org/Documentation/DevGuide/Extensions#Icon
+	-->
+	<icon>
+    	<default
+			xlink:href="Resources/Icon128.png"
+		/>
+	</icon>
+</description>

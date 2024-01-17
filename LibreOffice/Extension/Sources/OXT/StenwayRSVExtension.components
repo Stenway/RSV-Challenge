@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	StenwayRSVExtension.components
+	
+	||	Passive Component Registration / An XML Format
+	||	->	https://wiki.openoffice.org/wiki/Passive_Component_Registration#An_XML_Format
+-->
+<components
+	xmlns="http://openoffice.org/2010/uno-components"
+>
+	<!--
+		StenwayRSVExtension.uno.jar
+	-->
+	<component
+		uri="StenwayRSVExtension.uno.jar"
+		loader="com.sun.star.loader.Java2"
+	>
+		<implementation
+			name="com.stenway.libreoffice.rsvextension.RsvImportExportFilter"
+		>
+			<service
+				name="com.stenway.libreoffice.rsvextension.RsvImportExportFilter"
+			/>
+			<!--
+				ImportFilter
+				
+				||	->	https://www.openoffice.org/api/docs/common/ref/com/sun/star/document/ImportFilter.html
+			-->
+			<service
+				name="com.sun.star.document.ImportFilter"
+			/>
+			<!--
+				ExportFilter
+				
+				||	->	https://www.openoffice.org/api/docs/common/ref/com/sun/star/document/ExportFilter.html
+			-->
+			<service
+				name="com.sun.star.document.ExportFilter"
+			/>
+			<!--
+				ExtendedTypeDetection
+				
+				||	->	https://www.openoffice.org/api/docs/common/ref/com/sun/star/document/ExtendedTypeDetection.html
+			-->
+			<service
+				name="com.sun.star.document.ExtendedTypeDetection"
+			/>
+		</implementation>
+	</component>
+</components>

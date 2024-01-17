@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	META-INF/manifest.xml
+	
+	||	Developer's Guide / Extensions / File Format:
+	||	->	https://wiki.openoffice.org/wiki/Documentation/DevGuide/Extensions/File_Format
+	||	->	https://wiki.documentfoundation.org/Documentation/DevGuide/Extensions#File_Format
+-->
+<manifest:manifest
+	xmlns:manifest="http://openoffice.org/2001/manifest"
+>
+	<!--
+		StenwayRSVExtension.components
+		
+		||	Developer's Guide / Extensions / File Format / Passively Registered UNO Components:
+		||	->	https://wiki.openoffice.org/wiki/Documentation/DevGuide/Extensions/File_Format#Passively_Registered_UNO_Components
+		||	->	https://wiki.documentfoundation.org/Documentation/DevGuide/Extensions#Passively_Registered_UNO_Components
+	-->
+	<manifest:file-entry
+		manifest:full-path="StenwayRSVExtension.components"
+		manifest:media-type="application/vnd.sun.star.uno-components"
+	/>
+	
+	<!--
+		Types.xcu
+		
+		||	Developer's Guide / Extensions / File Format / Configuration Data Files:
+		||	->	https://wiki.openoffice.org/wiki/Documentation/DevGuide/Extensions/File_Format#Configuration_Data_Files
+		||	->	https://wiki.documentfoundation.org/Documentation/DevGuide/Extensions#Configuration_Data_Files
+	-->
+	<manifest:file-entry 
+		manifest:full-path="Types.xcu"
+		manifest:media-type="application/vnd.sun.star.configuration-data"
+	/>
+	
+	<!--
+		Filters.xcu
+		
+		||	Developer's Guide / Extensions / File Format / Configuration Data Files:
+		||	->	https://wiki.openoffice.org/wiki/Documentation/DevGuide/Extensions/File_Format#Configuration_Data_Files
+		||	->	https://wiki.documentfoundation.org/Documentation/DevGuide/Extensions#Configuration_Data_Files
+	-->
+	<manifest:file-entry 
+		manifest:full-path="Filters.xcu"
+		manifest:media-type="application/vnd.sun.star.configuration-data"
+	/>
+</manifest:manifest>

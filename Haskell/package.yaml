@@ -1,0 +1,67 @@
+name:                rsv
+version:             1.1.0.0
+github:              "prosumma/hs-rsv"
+license:             MIT
+author:              "Gregory Higley"
+maintainer:          "greg@prosumma.com"
+copyright:           "2024 Gregory Higley"
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/prosumma/hs-rsv#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- base64-bytestring
+- bytestring
+- containers
+- data-default
+- mtl
+- scientific
+- text
+- transformers
+- uuid
+
+ghc-options:
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wmissing-export-lists
+- -Wmissing-home-modules
+- -Wno-name-shadowing
+- -Wpartial-fields
+- -Wredundant-constraints
+
+library:
+  source-dirs: src
+
+executables:
+  rsv-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - rsv
+
+tests:
+  rsv-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - rsv
+    - hspec
+    - vector

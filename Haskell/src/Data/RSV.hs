@@ -81,10 +81,7 @@ import qualified Data.Text.Encoding as TE
 import qualified Data.UUID as UUID
 
 askGet :: (MonadReader env m, MonadState state m) => m (env, state)
-askGet = do
-  env <- ask
-  state <- get
-  return (env, state)
+askGet = liftA2 (,) ask get 
 
 valueTerminatorChar, nullChar, rowTerminatorChar :: Word8
 valueTerminatorChar = 0xFF

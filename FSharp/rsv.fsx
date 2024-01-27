@@ -91,8 +91,7 @@ module Rsv =
                 else validate state (idx + 1)
         validate 1 0
 
-let toJson (values:string array array) = 
-    System.Text.Json.JsonSerializer.Serialize(values)
+    // ------------------------------------------------------------
 
 
 let testFile path = 
@@ -142,5 +141,5 @@ Rsv.save "Test.rsv" rows
 let loaded = Rsv.load "Test.rsv"
 loaded |> Result.map ((=) rows)
 
-
+Rsv.load @"C:\Git\RSV-Challenge\TestFiles\Valid_001.rsv"
 

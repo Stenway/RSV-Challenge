@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<!--
+	(C) Stefan John / Stenway / Stenway.com / 2024
+-->
+<html>
+	<head>
+		<script
+			type="text/javascript"
+			src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"
+		>
+		</script>
+	</head>
+
+	<body>
+		<input
+			type="file"
+			id="selectedRsvFile"
+			accept=".rsv"
+			style="display: none;"
+		/>
+		
+		<button
+			id="importRsvButton"
+			onclick="document.getElementById('selectedRsvFile').click();"
+		>Import RSV</button>
+		
+		<button
+			id="exportRsvButton"
+		>Export RSV</button>
+		
+		<script>
+			Office.onReady((info) => {
+				if (info.host === Office.HostType.Excel) {
+					document.getElementById("exportRsvButton").onclick = doExportRsv;
+					document.getElementById("selectedRsvFile").onchange = doImportRsv;
+				}
+			});
+	
+			/* ---- Import ---- */
+			
+			function getRsvDownloadUrl(rows) {
+				const bytes = encodeRsv(rows);
+				const blob = new Blob([bytes], { type: 'application/rsv' });
+				return URL.createObjectURL(blob);
+			}
+			
+			function downloadRsv(rows, fileName) {
+				const url = getRsvDownloadUrl(rows);
+				const element = document.createElement('a')
+				element.href = url
+				element.download = fileName
+				element.style.display = 'none'
+				document.body.appendChild(element)
+				element.click()
+				document.body.removeChild(element)
+			}
+			
+			function encodeRsv(rows) {
+				const parts = [];
+				const valueTerminatorByte = new Uint8Array([0xFF]);
+				const nullValueByte = new Uint8Array([0xFE]);
+				const rowTerminatorByte = new Uint8Array([0xFD]);
+				const encoder = new TextEncoder();
+				for (const row of rows) {
+					for (const value of row) {
+						if (value === null) { parts.push(nullValueByte); }
+						else if (value.length > 0) {
+							if (!/\p{Surrogate}/u.test(value) === false) { throw new Error(`Invalid string value`); }
+							parts.push(encoder.encode(value));
+						}
+						parts.push(valueTerminatorByte);
+					}
+					parts.push(rowTerminatorByte);
+				}
+				const result = new Uint8Array(parts.reduce((result, bytes) => result + bytes.length, 0));
+				let offset = 0;
+				for (const bytes of parts) {
+					result.set(bytes, offset);
+					offset += bytes.length;
+				}
+				return result;
+			}
+	
+			async function getFileUrlAsync() {
+				return new Promise((resolve) => {
+					return Office.context.document.getFilePropertiesAsync(null, (result) => {
+						if (result && result.value && result.value.url) { resolve(result.value.url); }
+						else { resolve(null); }
+					});
+				});
+			}
+			
+			async function getFileNameAsync() {
+				let fileUrl = await getFileUrlAsync();
+				if (fileUrl === null) { return "Untitled"; }
+				fileUrl = decodeURIComponent(fileUrl);
+				const fileNameWithExtension = fileUrl.split("/").pop();
+				const lastDotIndex = fileNameWithExtension.lastIndexOf(".");
+				if (lastDotIndex < 0) { return fileNameWithExtension; }
+				return fileNameWithExtension.substring(0, lastDotIndex);
+			}
+
+			async function getRowsAsync(context, worksheet) {
+				const result = [];
+				const range = worksheet.getUsedRange();
+				range.load(["rowIndex", "columnIndex", "text"]);
+				await context.sync();
+				
+				const rowStart = range.rowIndex;
+				const columnIndex = range.columnIndex;
+				const textValues = range.text;
+
+				for (let i = 0; i < rowStart; i++) {
+					result.push([]);
+				}
+				for (let i = 0; i < textValues.length; i++) {
+					const currentTextValuesRow = textValues[i];
+					const currentRow = [];
+					let lastValueIndex = -1;
+					for (let j = 0; j < currentTextValuesRow.length; j++) {
+						const currentValue = currentTextValuesRow[j];
+						if (currentValue.length > 0) { lastValueIndex = j; }
+					}
+					if (lastValueIndex >= 0) {
+						for (let j = 0; j < columnIndex; j++) {
+							currentRow.push(null);
+						}
+					}
+					for (let j = 0; j < lastValueIndex+1; j++) {
+						const currentValue = currentTextValuesRow[j];
+						if (currentValue.length == 0) { currentRow.push(null); }
+						else { currentRow.push(currentValue); }
+					}
+					result.push(currentRow);
+				}
+				return result;
+			}
+			
+			async function exportRsvAsync(context) {
+				const worksheet = context.workbook.worksheets.getActiveWorksheet()
+				const rows = await getRowsAsync(context, worksheet);
+				const fileName = await getFileNameAsync();
+				downloadRsv(rows, fileName + ".rsv");
+			}
+			
+			async function doExportRsv() {
+				try {
+					await Excel.run(async (context) => {
+						await exportRsvAsync(context);
+					});
+				} catch (error) {
+					console.error(error);
+				}
+			}
+			
+			async function exportRsvAsync(context) {
+				const worksheet = context.workbook.worksheets.getActiveWorksheet()
+				const rows = await getRowsAsync(context, worksheet);
+				const fileName = await getFileNameAsync();
+				downloadRsv(rows, fileName + ".rsv");
+			}
+			
+			/* ---- Import RSV ---- */
+			
+			function decodeRsv(bytes) {
+				if (bytes.length > 0 && bytes[bytes.length-1] != 0xFD) { throw new Error("Incomplete RSV document"); }
+				const decoder = new TextDecoder("utf-8", {fatal: true, ignoreBOM: true});
+				const result = [];
+				let currentRow = [];
+				let valueStartIndex = 0;
+				for (let i=0; i<bytes.length; i++) {
+					if (bytes[i] == 0xFF) {
+						const length = i-valueStartIndex;
+						if (length == 0) { currentRow.push(""); }
+						else if (length == 1 && bytes[valueStartIndex] == 0xFE) { currentRow.push(null); }
+						else {
+							const valueBytes = bytes.subarray(valueStartIndex, valueStartIndex + length);
+							currentRow.push(decoder.decode(valueBytes));
+						}
+						valueStartIndex = i+1;
+					} else if (bytes[i] == 0xFD) {
+						if (i > 0 && valueStartIndex != i) { throw new Error("Incomplete RSV row"); }
+						result.push(currentRow);
+						currentRow = [];
+						valueStartIndex = i+1;
+					}
+				}
+				return result;
+			}
+			
+			async function setRows(context, rows, worksheet) {
+				for (let i=0; i<rows.length; i++) {
+					const row = rows[i].map(value => (value === null ? "" : value)).map(value => {
+						return {
+							type: Excel.CellValueType.string,
+							basicValue: value
+						};
+					});
+					if (row.length === 0) { continue; }
+					const rowRange = worksheet.getRangeByIndexes(i, 0, 1, row.length);
+					rowRange.valuesAsJson = [row];
+				}
+				const usedRange = worksheet.getUsedRange();
+				usedRange.format.autofitColumns();
+				await context.sync();
+			}
+			
+			async function importRsvAsync(context, input) {
+				if (input.files.length !== 1) { return; }
+				const file = input.files[0];
+				const arrayBuffer = await file.arrayBuffer();
+				const bytes = new Uint8Array(arrayBuffer);
+				const rows = decodeRsv(bytes);
+  				
+				const worksheet = context.workbook.worksheets.getActiveWorksheet();
+				await setRows(context, rows, worksheet);
+			}
+			
+			async function doImportRsv() {
+				try {
+					const input = document.getElementById("selectedRsvFile");
+					await Excel.run(async (context) => {
+						await importRsvAsync(context, input);
+					});
+				} catch (error) {
+					console.error(error);
+				}
+			}
+		</script>
+	</body>
+</html>

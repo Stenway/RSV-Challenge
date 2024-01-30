@@ -1,10 +1,10 @@
-{-# LANGUAGE ExistentialQuantification, FlexibleContexts, FlexibleInstances, GeneralisedNewtypeDeriving, OverloadedStrings, RecordWildCards, ScopedTypeVariables, TypeFamilies #-}
+{-# LANGUAGE ExistentialQuantification, FlexibleContexts, FlexibleInstances, GeneralisedNewtypeDeriving, MultiParamTypeClasses, OverloadedStrings, RecordWildCards #-}
 
 module Data.RSV (
   allTrueValues,
   allFalseValues,
   convertValue,
-  decodeValue,
+  conversionError,
   defaultFalseValues,
   defaultTrueValues,
   en,
@@ -19,9 +19,6 @@ module Data.RSV (
   encodeText,
   encodeValue,
   encodeWith,
-  foldApp,
-  mappendA,
-  newParserState,
   nullChar,
   parse,
   parseBinary,
@@ -31,82 +28,63 @@ module Data.RSV (
   parseRow,
   parseString,
   parseText,
-  parseValue,
   parseWith,
   permitNull,
   rowTerminatorChar,
+  runEncoder,
   throwIndexedException,
+  toMarker,
   valueTerminatorChar,
   Encodable(..),
+  Encoder,
+  EncoderContext(..),
   FromRow(..),
   FromValue(..),
   IndexedException,
+  Marker(..),
+  Parser,
   ParserException(..),
   ParserConfig(..),
-  ParserIndices(..),
+  ParserIndices,
   ParseResult,
-  ParserState(..),
-  RowParser,
+  ParserState,
   ToRow(..),
-  ToValue(..),
-  ValueParser,
-  (<+>)
+  ToValue(..)
 ) where
 
 import Control.Applicative
 import Control.Monad.Error.Class
-import Control.Monad.Reader (asks, runReader, MonadReader(..), Reader)
-import Control.Monad.State (gets, modify, MonadState(..))
-import Control.Monad.Trans.RWS (evalRWST, runRWST, RWST)
+import Control.Monad.Reader
+import Control.Monad.RWS
 import Data.Bifunctor
+import Data.ByteString (StrictByteString)
 import Data.ByteString.Builder
 import Data.ByteString.Lazy (LazyByteString)
-import Data.ByteString (StrictByteString)
 import Data.Default
+import Data.Word
 import Data.Scientific
 import Data.Set (member, Set)
 import Data.Text (Text)
 import Data.UUID (UUID)
-import Data.Word
 import Text.Printf
-import Text.Read hiding (get)
+import Text.Read hiding (get, EOF)
 
 import qualified Data.ByteString as SB
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Base64.Lazy as B64L
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.Set as Set
-import qualified Data.Text as T
+import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TE
 import qualified Data.UUID as UUID
-
-askGet :: (MonadReader env m, MonadState state m) => m (env, state)
-askGet = liftA2 (,) ask get 
 
 valueTerminatorChar, nullChar, rowTerminatorChar :: Word8
 valueTerminatorChar = 0xFF
 nullChar = 0xFE
 rowTerminatorChar = 0xFD
 
-data ParserIndices = ParserIndices {
-  byteIndex  :: !Integer,
-  valueIndex :: !Integer,
-  rowIndex   :: !Integer
-} deriving (Eq, Show)
-
-advanceByteIndex :: ParserIndices -> ParserIndices
-advanceByteIndex (ParserIndices b v r) = ParserIndices (b + 1) v r
-
-data ParserState = ParserState {
-  remainingBytes :: [Word8],
-  parserIndices  :: !ParserIndices
-} deriving (Eq, Show)
-
-newParserState :: LazyByteString -> ParserState
-newParserState lbs = ParserState (LB.unpack lbs) (ParserIndices 0 0 0)
-
-advanceParserState :: [Word8] -> ParserState -> ParserState
-advanceParserState bytes (ParserState _ indices) = ParserState bytes (advanceByteIndex indices)
+type ParserIndices = (Integer, Integer, Integer)
+type ParserState = (ParserIndices, [Word8])
 
 data ParserConfig = ParserConfig {
   trueValue   :: !Text,
@@ -130,118 +108,133 @@ defaultFalseValues = Set.fromList ["f", "no", "n", "0"]
 instance Default ParserConfig where
   def = ParserConfig "true" "false" defaultTrueValues defaultFalseValues 
 
-data ParserException = UnknownError | UnexpectedEOF | UnexpectedNull | UnexpectedRowTerminator | UnpermittedNull | UnicodeError | ConversionError String | MissingRowTerminator deriving (Eq, Show)
+data Marker = ValueMarker | RowMarker | NullMarker | EOF deriving (Eq, Show)
+
+toMarker :: Word8 -> Maybe Marker
+toMarker 0xFD = Just RowMarker
+toMarker 0xFE = Just NullMarker
+toMarker 0xFF = Just ValueMarker
+toMarker _ = Nothing 
+
+data ParserException = Unexpected Marker | Expected Marker | UnicodeError | UnpermittedNull | ConversionError String deriving (Eq, Show)
 type IndexedException = (ParserIndices, ParserException)
 
-newtype ValueParser a = ValueParser (RWST ParserConfig () ParserState (Either IndexedException) a)
+conversionError :: String
+conversionError = "Could not convert string %s to desired type %s."
+
+newtype Parser a = Parser { unParser :: RWST ParserConfig () ParserState (Either IndexedException) a }
   deriving (Functor, Applicative, Monad, MonadReader ParserConfig, MonadState ParserState, MonadError IndexedException)
 
-throwIndexedException :: (MonadState ParserState m, MonadError IndexedException m) => ParserException -> m a
+throwIndexedException :: ParserException -> Parser a 
 throwIndexedException e = do
-  indices <- gets parserIndices
+  indices <- gets fst 
   throwError (indices, e)
 
-instance Alternative ValueParser where
-  empty = throwIndexedException UnknownError
-  (ValueParser lhs) <|> (ValueParser rhs) = ValueParser $ do
-    (config, state) <- askGet
-    let result = runRWST lhs config state
-    case result of
-      Left _ -> rhs
-      Right (a, newState, _) -> put newState >> return a
-
-decodeValue :: ParserState -> Either IndexedException (Maybe StrictByteString, ParserState)
-decodeValue state = first toStrictByteString <$> decodeValue' (resetValueIndex state) mempty False
-  where
-    decodeValue' :: ParserState -> [Word8] -> Bool -> ParseResult ([Word8], ParserState)
-    decodeValue' (ParserState [] indices) _ _ = throwError (indices, UnexpectedEOF)
-    decodeValue' state@(ParserState (byte:remainingBytes) indices) accum hasNull
-      | byte == rowTerminatorChar = throwError (indices, UnexpectedRowTerminator)
-      | not (null accum) && byte == nullChar = throwError (indices, UnexpectedNull)
-      | not hasNull && byte == nullChar = decodeValue' (advanceParserState remainingBytes state) [byte] True
-      | hasNull && byte /= valueTerminatorChar = throwError (rewindByteIndex indices, UnexpectedNull)
-      | byte == valueTerminatorChar = return (accum, advanceParserState remainingBytes state)
-      | otherwise = decodeValue' (advanceParserState remainingBytes state) (accum <> [byte]) hasNull
-    toStrictByteString :: [Word8] -> Maybe StrictByteString
-    toStrictByteString bytes
-      | bytes == [nullChar] = Nothing
-      | otherwise = Just $ SB.pack bytes
-    resetValueIndex :: ParserState -> ParserState
-    resetValueIndex (ParserState bytes (ParserIndices b _ r)) = ParserState bytes (ParserIndices b b r)
-    rewindByteIndex :: ParserIndices -> ParserIndices
-    rewindByteIndex (ParserIndices b v r) = ParserIndices (b - 1) v r
-
-parseValue :: ValueParser StrictByteString
-parseValue = do
-  result <- gets decodeValue
-  case result of
-    Left e -> throwError e
-    Right (Nothing, newState) -> put newState >> throwIndexedException UnpermittedNull
-    Right (Just bs, newState) -> put newState >> return bs
-
-parseText :: ValueParser Text
-parseText = do
-  sbs <- parseValue
-  case TE.decodeUtf8' sbs of
-    Left _ -> throwIndexedException UnicodeError
-    Right t -> return t
-
-parseString :: ValueParser String
-parseString = T.unpack <$> parseText
-
-parseBinary :: ValueParser StrictByteString
-parseBinary = parseValue >>= convertValue B64.decode
-
-parseBinaryLazy :: ValueParser LazyByteString
-parseBinaryLazy = LB.fromStrict <$> parseBinary
-
-parseRead :: Read a => String -> ValueParser a
-parseRead typename = do
-  s <- parseString
-  case readMaybe s of
-    Nothing -> throwIndexedException $ ConversionError $ printf "Could not convert string %s to desired type %s." s typename
-    Just a -> return a
-
-parseBool :: ValueParser Bool
-parseBool = do
-    config <- ask
-    parseText >>= convertValue (toBool config)
-    where
-      toBool :: ParserConfig -> Text -> Either String Bool
-      toBool config text
-        | lowerText `member` allTrueValues config = return True 
-        | lowerText `member` allFalseValues config = return False
-        | otherwise = throwError $ printf "Could not convert string %s to desired type Bool." (show text) 
-        where
-          lowerText = T.toLower text
-
-parseList :: FromValue a => ValueParser [a]
-parseList = do 
-  done <- isAtRowTerminator
-  if done
-    then return []
-    else liftA2 (:) fromValue parseList
-  where
-    isAtRowTerminator = gets remainingBytes >>= checkRowTerminator 
-    checkRowTerminator [] = throwIndexedException UnexpectedEOF 
-    checkRowTerminator (byte:_)
-      | byte == rowTerminatorChar = return True
-      | otherwise = return False
-
-convertValue :: (v -> Either String a) -> v -> ValueParser a
-convertValue convert value = case convert value of
-  Left error -> throwIndexedException (ConversionError error)
+liftEitherIndexed :: Either ParserException a -> Parser a
+liftEitherIndexed e' = case e' of 
+  Left e -> throwIndexedException e 
   Right a -> return a
 
-permitNull :: ValueParser a -> ValueParser (Maybe a)
-permitNull parser = catchError (Just <$> parser) handleError
+instance Alternative Parser where
+  empty = throwIndexedException $ Expected EOF
+  a <|> b = catchError a (const b) 
+
+instance Semigroup a => Semigroup (Parser a) where
+  a <> b = liftA2 (<>) a b
+
+instance Monoid a => Monoid (Parser a) where
+  mempty = Parser $ return mempty
+
+consume :: Int -> Parser ()
+consume n = do
+  (indices@(i, v, r), bytes) <- get 
+  if null bytes
+    then throwError (indices, Unexpected EOF)
+    else put ((i + fromIntegral n, v, r), drop n bytes)
+
+advance :: Parser ()
+advance = consume 1
+
+next :: Parser Word8
+next = do
+  bytes <- gets snd
+  case bytes of
+    [] -> throwIndexedException $ Unexpected EOF
+    (byte:_) -> return byte
+
+value :: Parser [Word8]
+value = parseValue $ null' <|> value' 
   where
-    handleError (_, UnpermittedNull) = modify advanceBy2 >> return Nothing
-    handleError e = throwError e
-    advanceBy2 (ParserState bytes (ParserIndices b v r)) = ParserState (drop 2 bytes) (ParserIndices (b + 2) v r)
+    null' = do
+      n <- next
+      case toMarker n of
+        Just NullMarker -> advance >> return [n]
+        _ -> throwIndexedException $ Expected NullMarker
+    value' = do 
+      n <- next
+      case toMarker n of
+        Nothing -> advance >> (n :) <$> value'
+        Just ValueMarker -> return []
+        Just marker -> throwIndexedException $ Unexpected marker
+    parseValue parser = do
+      resetValueIndex
+      a <- parser
+      n <- next
+      case toMarker n of
+        Just ValueMarker -> do
+          advance
+          case a of
+            [0xFE] -> throwIndexedException UnpermittedNull
+            _ -> return a
+        _ -> throwIndexedException $ Expected ValueMarker
+    resetValueIndex :: Parser ()
+    resetValueIndex = do
+      (i, _, r) <- gets fst
+      modify $ first $ const (i, i, r) 
+
+convert :: (v -> Either ParserException a) -> v -> Parser a
+convert f = liftEitherIndexed . f 
+
+convertValue :: ([Word8] -> Either ParserException a) -> Parser a
+convertValue f = value >>= convert f
+
+parseText :: Parser Text
+parseText = convertValue $ first (const UnicodeError) . TE.decodeUtf8' . SB.pack 
+
+parseString :: Parser String
+parseString = Text.unpack <$> parseText
+
+parseBinary :: Parser StrictByteString
+parseBinary = convertValue $ first ConversionError . B64.decode . SB.pack
+
+parseBinaryLazy :: Parser LazyByteString
+parseBinaryLazy = convertValue $ first ConversionError . B64L.decode . LB.pack
+
+parseBool :: Parser Bool
+parseBool = do 
+  config <- ask
+  t <- parseText
+  case (t `member` allTrueValues config, t `member` allFalseValues config) of
+    (True, _) -> return True
+    (_, True) -> return False
+    _ -> throwIndexedException $ ConversionError $ printf conversionError (Text.unpack t) ("Bool" :: String)
+
+parseRead :: Read a => String -> Parser a
+parseRead typeName = parseString >>= convert convertString 
+  where
+    convertString s = maybeToEither $ readMaybe s 
+      where
+        maybeToEither Nothing = Left $ ConversionError $ printf conversionError s typeName 
+        maybeToEither (Just a) = Right a
+
+permitNull :: Parser a -> Parser (Maybe a)
+permitNull parser = catchError (Just <$> parser) handleNull
+  where
+    handleNull (_, UnpermittedNull) = consume 2 >> return Nothing 
+    handleNull e = throwError e
 
 class FromValue a where
-  fromValue :: ValueParser a
+  fromValue :: Parser a
 
 instance FromValue Text where
   fromValue = parseText
@@ -265,12 +258,12 @@ instance FromValue Bool where
   fromValue = parseBool 
 
 instance FromValue UUID where
-  fromValue = parseString >>= convertValue toUUID
+  fromValue = parseString >>= convert toUUID
     where
-      toUUID :: String -> Either String UUID
+      toUUID :: String -> Either ParserException UUID
       toUUID s = case UUID.fromString s of
         Just uuid -> return uuid
-        Nothing -> throwError $ printf "Could not convert %s to a UUID." s
+        Nothing -> throwError $ ConversionError $ printf "Could not convert %s to a UUID." s
 
 instance FromValue StrictByteString where
   fromValue = parseBinary
@@ -281,35 +274,28 @@ instance FromValue LazyByteString where
 instance FromValue a => FromValue (Maybe a) where
   fromValue = permitNull fromValue
 
-newtype RowParser a = RowParser (RWST ParserConfig () ParserState (Either IndexedException) a)
-  deriving (Functor, Applicative, Monad, MonadReader ParserConfig, MonadState ParserState, MonadError IndexedException)
+parseList :: FromValue a => Parser [a]
+parseList = do
+  n <- next
+  case toMarker n of
+    Just RowMarker -> return []
+    _ -> liftA2 (:) fromValue parseList 
 
-instance Alternative RowParser where
-  empty = throwIndexedException UnknownError
-  (RowParser lhs) <|> (RowParser rhs) = RowParser $ do
-    (config, state) <- askGet
-    let result = runRWST lhs config state 
-    case result of
-      Left _ -> rhs
-      Right (a, newState, _) -> put newState >> return a
-
-parseRow :: ValueParser a -> RowParser a
-parseRow (ValueParser parser) = do
-  (config, state) <- askGet
-  case runRWST parser config (resetRow state) of
-    Left e -> throwError e
-    Right (result, newState, _) -> put newState >> finish result (remainingBytes newState)
+parseRow :: Parser a -> Parser a
+parseRow parser = do 
+  resetRowIndex
+  a <- parser
+  n <- next
+  case toMarker n of
+    Just RowMarker -> advance >> return a 
+    _ -> throwIndexedException $ Expected RowMarker 
   where
-    finish _ [] = throwIndexedException UnexpectedEOF
-    finish a (byte:bytes)
-      | byte == rowTerminatorChar = modify (advanceParserState bytes) >> return a
-      | otherwise = throwIndexedException MissingRowTerminator
-    resetRow (ParserState bytes indices) = ParserState bytes (resetRowIndex indices)
-    resetRowIndex :: ParserIndices -> ParserIndices
-    resetRowIndex (ParserIndices b _ _) = ParserIndices b b b
+    resetRowIndex = do
+      (i, _, _) <- gets fst
+      modify $ first $ const (i, i, i)
 
 class FromRow a where
-  fromRow :: RowParser a
+  fromRow :: Parser a
 
 instance (FromValue a, FromValue b) => FromRow (a, b) where
   fromRow = parseRow $ (,) <$> fromValue <*> fromValue
@@ -348,7 +334,7 @@ instance (FromValue a, FromValue b, FromValue c, FromValue d, FromValue e, FromV
   fromRow = parseRow $ (,,,,,,,,,,,,) <$> fromValue <*> fromValue <*> fromValue <*> fromValue <*> fromValue <*> fromValue <*> fromValue <*> fromValue <*> fromValue <*> fromValue <*> fromValue <*> fromValue <*> fromValue
 
 instance FromValue a => FromRow [a] where
-  fromRow = parseRow parseList
+  fromRow = parseRow parseList 
 
 instance (FromValue a, Ord a) => FromRow (Set a) where
   fromRow = Set.fromList <$> fromRow 
@@ -356,35 +342,33 @@ instance (FromValue a, Ord a) => FromRow (Set a) where
 type ParseResult a = Either IndexedException a
 
 parseWith :: FromRow a => ParserConfig -> LazyByteString -> ParseResult [a] 
-parseWith config lbs = fst <$> evalRWST (parse' fromRow) config (newParserState lbs)
+parseWith config lbs = fst <$> evalRWST (unParser parse') config ((0, 0, 0), LB.unpack lbs) 
   where
-    parse' (RowParser parser) = do 
-      isAtEnd <- atEnd
-      if isAtEnd
+    parse' = do
+      bytes <- gets snd
+      if null bytes
         then return []
-        else liftA2 (:) parser (parse' (RowParser parser))
-    atEnd = gets $ null . remainingBytes
+        else liftA2 (:) fromRow parse'
 
 parse :: FromRow a => LazyByteString -> ParseResult [a] 
 parse = parseWith def
 
-type Encoder = Reader ParserConfig Builder
+newtype EncoderContext a = EncoderContext (Reader ParserConfig a)
+    deriving (Functor, Applicative, Monad, MonadReader ParserConfig)
 
-infixr 6 `mappendA`
+runEncoder :: EncoderContext a -> ParserConfig -> a
+runEncoder (EncoderContext reader) = runReader reader
 
-mappendA :: (Applicative f, Monoid m) => f m -> f m -> f m 
-mappendA = liftA2 (<>)
+instance Semigroup m => Semigroup (EncoderContext m) where
+  a <> b = liftA2 (<>) a b
 
-infixr 6 <+>
+instance Monoid m => Monoid (EncoderContext m) where
+  mempty = EncoderContext $ return mempty 
 
-(<+>) :: (Applicative f, Monoid m) => f m -> f m -> f m 
-a <+> b = mappendA a b 
-
-foldApp :: (Foldable t, Monoid m, Applicative f) => (a -> f m) -> t a -> f m
-foldApp f = foldr (\a accum -> f a <+> accum) (pure mempty)
+type Encoder = EncoderContext Builder 
 
 encodeValue :: Encoder -> Encoder 
-encodeValue encoder = encoder <+> pure (word8 valueTerminatorChar)
+encodeValue encoder = encoder <> pure (word8 valueTerminatorChar)
 
 encodeBuilder :: Builder -> Encoder
 encodeBuilder = encodeValue . pure
@@ -396,7 +380,7 @@ encodeStringUnsafe :: String -> Encoder
 encodeStringUnsafe = encodeBuilder . stringUtf8 
 
 encodeText :: Text -> Encoder
-encodeText = encodeStringUnsafe . T.unpack
+encodeText = encodeStringUnsafe . Text.unpack
 
 encodeShow :: Show a => a -> Encoder 
 encodeShow = encodeStringUnsafe . show
@@ -449,13 +433,13 @@ instance ToValue a => ToValue (Maybe a) where
   toValue (Just a) = toValue a
 
 encodeRow :: Encoder -> Encoder
-encodeRow = (<+> pure (word8 rowTerminatorChar))
+encodeRow = (<> pure (word8 rowTerminatorChar))
 
 class ToRow a where
   toRow :: a -> Encoder
 
 instance (Foldable t, ToValue a) => ToRow (t a) where
-  toRow = encodeRow . foldApp toValue
+  toRow = encodeRow . foldMap toValue
 
 data Encodable = forall a. ToValue a => Encodable !a
 
@@ -502,7 +486,7 @@ instance {-# OVERLAPPING #-} (ToValue a, ToValue b, ToValue c, ToValue d, ToValu
   toRow (a, b, c, d, e, f, g, h, i, j, k, l, m) = toRow [en a, en b, en c, en d, en e, en f, en g, en h, en i, en j, en k, en l, en m]
 
 encodeWith :: (Foldable t, ToRow a) => ParserConfig -> t a -> LazyByteString
-encodeWith config rows = toLazyByteString $ runReader (foldApp toRow rows) config
+encodeWith config rows = toLazyByteString $ runEncoder (foldMap toRow rows) config
 
 encode :: (Foldable t, ToRow a) => t a -> LazyByteString
 encode = encodeWith def

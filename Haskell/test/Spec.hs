@@ -28,7 +28,7 @@ data Person = Person {
 } deriving (Eq, Show)
 
 instance ToRow Person where
-  toRow Person{..} = encodeRow $ toValue id <+> toValue name <+> toValue birthYear
+  toRow Person{..} = encodeRow $ toValue id <> toValue name <> toValue birthYear
 
 instance FromRow Person where
   fromRow = parseRow $ Person <$> fromValue <*> fromValue <*> fromValue
@@ -64,31 +64,31 @@ main = hspec $ do
     it "wants to parse fully before unexpected EOF" $ do
       let lbs = LB.pack [0xFE]
       case parse lbs :: ParseResult [[Maybe Int]] of
-        Left (indices, UnexpectedEOF) -> indices `shouldBe` ParserIndices 1 0 0
+        Left (indices, Unexpected EOF) -> indices `shouldBe` (1, 0, 0) 
         Left e -> expectationFailure (show e)
         _ -> expectationFailure "Expected to fail with UnexpectedEOF at the correct indices"
     it "wants row terminators to be in the proper location" $ do
       let lbs = LB.pack [0xFE, 0xFD, 0xFF]
       case parse lbs :: ParseResult [[Maybe Text]] of
-        Left (indices, UnexpectedRowTerminator) -> indices `shouldBe` ParserIndices 1 0 0 
+        Left (indices, Expected ValueMarker) -> indices `shouldBe` (1, 0, 0) 
         Left e -> expectationFailure (show e)
         _ -> expectationFailure "Expected to fail with UnexpectedRowTerminator at the correct indices"
     it "wants nulls to be solo with no preceding UTF-8 characters" $ do
       let lbs = LB.pack [0x69, 0xFE, 0xFF, 0xFD]
       case parse lbs :: ParseResult [[Maybe String]] of
-        Left (indices, UnexpectedNull) -> indices `shouldBe` ParserIndices 1 0 0
+        Left (indices, Unexpected NullMarker) -> indices `shouldBe` (1, 0, 0) 
         Left e -> expectationFailure (show e)
         _ -> expectationFailure "Expected to fail with UnexpectedNull at the correct indices"
     it "wants nulls to be solo with no following UTF-8 characters" $ do
       let lbs = LB.pack [0xFE, 0x69, 0xFF, 0xFD]
       case parse lbs :: ParseResult [[Maybe String]] of
-        Left (indices, UnexpectedNull) -> indices `shouldBe` ParserIndices 0 0 0
+        Left (indices, Expected ValueMarker) -> indices `shouldBe` (1, 0, 0) 
         Left e -> expectationFailure (show e)
         _ -> expectationFailure "Expected to fail with UnexpectedNull at the correct indices"
     it "wants to parse valid UTF-8" $ do
       let lbs = LB.pack [0xFE, 0xFF, 0xC2, 0x20, 0x20, 0xFF, 0xFD]
       case parse lbs :: ParseResult [[Maybe Text]] of 
-        Left (indices, UnicodeError) -> indices `shouldBe` ParserIndices 6 2 0 
+        Left (indices, UnicodeError) -> indices `shouldBe` (6, 2, 0)
         Left e -> expectationFailure (show e)
         _ -> expectationFailure "Expected to fail with a UnicodeError"
     it "supports arbitrary Haskell types" $ do
@@ -100,9 +100,9 @@ main = hspec $ do
     it "throws a ConversionError if a value can't be converted to Bool" $ do
       let lbs = LB.pack [0x7A, 0xFF, 0xFD]
       case parse lbs :: ParseResult [[Bool]] of
-        Left (indices, ConversionError "Could not convert string \"z\" to desired type Bool.") -> indices `shouldBe` ParserIndices 2 0 0
+        Left (indices, ConversionError "Could not convert string z to desired type Bool.") -> indices `shouldBe` (2, 0, 0) 
         Left e -> expectationFailure (show e)
-        _ -> expectationFailure ""
+        _ -> expectationFailure "Expected to throw a ConversionError but it succeeded."
     it "supports Alternative when parsing" $ do
       let input = [XInt 3, XText "three"]
       case roundtrip input of

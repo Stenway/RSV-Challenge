@@ -1,0 +1,86 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.36.0.
+--
+-- see: https://github.com/sol/hpack
+
+name:           rsv
+version:        1.3.0.0
+description:    Please see the README on GitHub at <https://github.com/prosumma/hs-rsv#readme>
+homepage:       https://github.com/prosumma/hs-rsv#readme
+bug-reports:    https://github.com/prosumma/hs-rsv/issues
+author:         Gregory Higley
+maintainer:     greg@prosumma.com
+copyright:      2024 Gregory Higley
+license:        MIT
+build-type:     Simple
+
+source-repository head
+  type: git
+  location: https://github.com/prosumma/hs-rsv
+
+library
+  exposed-modules:
+      Data.RSV
+  other-modules:
+      Paths_rsv
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wno-name-shadowing -Wpartial-fields -Wredundant-constraints
+  build-depends:
+      base >=4.7 && <5
+    , base64-bytestring
+    , bytestring
+    , containers
+    , data-default
+    , mtl
+    , scientific
+    , text
+    , transformers
+    , uuid
+  default-language: Haskell2010
+
+executable rsv-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_rsv
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wno-name-shadowing -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , base64-bytestring
+    , bytestring
+    , containers
+    , data-default
+    , mtl
+    , rsv
+    , scientific
+    , text
+    , transformers
+    , uuid
+  default-language: Haskell2010
+
+test-suite rsv-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_rsv
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wno-name-shadowing -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , base64-bytestring
+    , bytestring
+    , containers
+    , data-default
+    , hspec
+    , mtl
+    , rsv
+    , scientific
+    , text
+    , transformers
+    , uuid
+    , vector
+  default-language: Haskell2010

@@ -1,0 +1,8 @@
+(library
+ (name rsv)
+ (modules rsv))
+
+(executable
+ (name test)
+ (modules test)
+ (libraries rsv yojson))

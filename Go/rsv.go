@@ -1,4 +1,4 @@
-﻿/* (C) Stefan John / Stenway / Stenway.com / 2023 */
+/* (C) Stefan John / Stenway / Stenway.com / 2023 */
 
 package main
 
@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"unicode/utf8"
 )
@@ -17,36 +18,51 @@ type NullableString struct {
 	IsNull bool
 }
 
-func Str(str string) NullableString { return NullableString{Value: str, IsNull: false} }
-func Null() NullableString          { return NullableString{IsNull: true} }
+func Str(s string) NullableString { return NullableString{Value: s, IsNull: false} }
+func Null() NullableString        { return NullableString{Value: "", IsNull: true} }
 
 // ----------------------------------------------------------------------
 
+const (
+	valTerm = 0xFF // Mark the end of a value
+	nullVal = 0xFE // Mark a null value
+	rowTerm = 0xFD // Mark the end of a row
+)
+
+var (
+	errInvalidString = errors.New("invalid UTF-8 string")
+	errIncompleteDoc = errors.New("incomplete RSV document")
+	errIncompleteRow = errors.New("incomplete RSV row")
+)
+
 func EncodeRsv(rows [][]NullableString) ([]byte, error) {
-	parts := [][]byte{}
-	valueTerminatorByte := []byte{0xFF}
-	nullValueByte := []byte{0xFE}
-	rowTerminatorByte := []byte{0xFD}
+	var (
+		vt = []byte{valTerm}
+		nv = []byte{nullVal}
+		rt = []byte{rowTerm}
+
+		parts = [][]byte{}
+	)
 	for _, row := range rows {
-		for _, value := range row {
-			if value.IsNull {
-				parts = append(parts, nullValueByte)
-			} else if len(value.Value) > 0 {
-				if !utf8.ValidString(value.Value) {
-					return nil, errors.New("Invalid string value")
+		for _, x := range row {
+			if x.IsNull {
+				parts = append(parts, nv)
+			} else if v := x.Value; len(v) > 0 {
+				if !utf8.ValidString(v) {
+					return nil, errInvalidString
 				}
-				parts = append(parts, []byte(value.Value))
+				parts = append(parts, []byte(v))
 			}
-			parts = append(parts, valueTerminatorByte)
+			parts = append(parts, vt)
 		}
-		parts = append(parts, rowTerminatorByte)
+		parts = append(parts, rt)
 	}
 	return bytes.Join(parts, nil), nil
 }
 
 func DecodeRsv(bytes []byte) ([][]NullableString, error) {
 	if len(bytes) > 0 && bytes[len(bytes)-1] != 0xFD {
-		return nil, errors.New("Incomplete RSV document")
+		return nil, errIncompleteDoc
 	}
 	result := [][]NullableString{}
 	currentRow := []NullableString{}
@@ -61,14 +77,14 @@ func DecodeRsv(bytes []byte) ([][]NullableString, error) {
 			} else {
 				str := string(bytes[valueStartIndex : valueStartIndex+length])
 				if !utf8.ValidString(str) {
-					return nil, errors.New("Invalid string value")
+					return nil, errInvalidString
 				}
 				currentRow = append(currentRow, Str(str))
 			}
 			valueStartIndex = i + 1
 		} else if bytes[i] == 0xFD {
 			if i > 0 && valueStartIndex != i {
-				return nil, errors.New("Incomplete RSV row")
+				return nil, errIncompleteRow
 			}
 			result = append(result, currentRow)
 			currentRow = []NullableString{}
@@ -115,7 +131,7 @@ func AppendRsv(rows [][]NullableString, filePath string, permissions os.FileMode
 			return err
 		}
 		if b[0] != 0xFD {
-			return errors.New("Incomplete RSV document")
+			return errIncompleteDoc
 		}
 		if len(rows) == 0 {
 			return nil
@@ -146,14 +162,14 @@ func DecodeRsvUsingSplit(rsvBytes []byte) ([][]NullableString, error) {
 		return result, nil
 	}
 	if rsvBytes[len(rsvBytes)-1] != 0xFD {
-		return nil, errors.New("Incomplete RSV document")
+		return nil, errIncompleteDoc
 	}
 	bytesOfRows := bytes.Split(rsvBytes[0:len(rsvBytes)-1], []byte{0xFD})
 	for _, rowBytes := range bytesOfRows {
 		currentRow := []NullableString{}
 		if len(rowBytes) > 0 {
 			if rowBytes[len(rowBytes)-1] != 0xFF {
-				return nil, errors.New("Incomplete RSV row")
+				return nil, errIncompleteRow
 			}
 			bytesOfValues := bytes.Split(rowBytes[0:len(rowBytes)-1], []byte{0xFF})
 			for _, valueBytes := range bytesOfValues {
@@ -162,7 +178,7 @@ func DecodeRsvUsingSplit(rsvBytes []byte) ([][]NullableString, error) {
 				} else {
 					strValue := string(valueBytes)
 					if !utf8.ValidString(strValue) {
-						return nil, errors.New("Invalid string value")
+						return nil, errInvalidString
 					}
 					currentRow = append(currentRow, Str(strValue))
 				}
@@ -183,7 +199,7 @@ func LoadRsvUsingSplit(filePath string) ([][]NullableString, error) {
 
 // ----------------------------------------------------------------------
 
-var byteClassLookup = []byte{
+var byteClassLookup = [256]int{
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -202,7 +218,7 @@ var byteClassLookup = []byte{
 	9, 10, 10, 10, 11, 0, 0, 0, 0, 0, 0, 0, 0, 12, 13, 14,
 }
 
-var stateTransitionLookup = []byte{
+var stateTransitionLookup = [180]int{
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 2, 0, 0, 0, 3, 4, 6, 5, 7, 8, 9, 1, 10, 11,
 	0, 2, 0, 0, 0, 3, 4, 6, 5, 7, 8, 9, 0, 0, 11,
@@ -222,8 +238,8 @@ func IsValidRsv(bytes []byte) bool {
 	for i := 0; i < len(bytes); i++ {
 		currentByte := bytes[i]
 		currentByteClass := byteClassLookup[currentByte]
-		newStateLookupIndex := lastState*15 + int(currentByteClass)
-		lastState = int(stateTransitionLookup[newStateLookupIndex])
+		newStateLookupIndex := lastState*15 + currentByteClass
+		lastState = stateTransitionLookup[newStateLookupIndex]
 		if lastState == 0 {
 			return false
 		}
@@ -260,7 +276,7 @@ func EscapeJsonString(str string) string {
 			result.WriteString("\\\"")
 		} else if c == 0x5C {
 			result.WriteString("\\\\")
-		} else if c >= 0x00 && c <= 0x1F {
+		} else if c <= 0x1F {
 			result.WriteString(fmt.Sprintf("\\u%04x", int(c)))
 		} else {
 			result.WriteByte(c)
@@ -305,16 +321,29 @@ func PrintRsvToJson(rows [][]NullableString) {
 // ----------------------------------------------------------------------
 
 func CheckTestFiles() {
+	thisDir, err := filepath.Abs(".")
+	if err != nil {
+		panic(fmt.Errorf("could not get abs path of \".\": %v", err))
+	}
+	testDir, err := filepath.Abs("./../TestFiles")
+	if err != nil {
+		panic(fmt.Errorf("could not get abs path to TestFile: %v", err))
+	}
+
 	for i := 1; i <= 79; i++ {
-		filePath := fmt.Sprintf("./../TestFiles/Valid_%03d", i)
-		fmt.Println("Checking valid test file:", filePath)
-		loadedRows, err := LoadRsv(filePath + ".rsv")
+		fname := fmt.Sprintf("Valid_%03d", i)
+		fpath := filepath.Join(testDir, fname)
+		relPath, _ := filepath.Rel(thisDir, fpath)
+
+		fmt.Println("Checking valid test file:  ", relPath)
+
+		loadedRows, err := LoadRsv(fpath + ".rsv")
 		if err != nil {
 			panic("Could not load RSV file")
 		}
 		jsonStr := RsvToJson(loadedRows)
 
-		loadedJsonBytes, err := os.ReadFile(filePath + ".json")
+		loadedJsonBytes, err := os.ReadFile(fpath + ".json")
 		if err != nil {
 			panic("Could not load JSON file")
 		}
@@ -323,7 +352,7 @@ func CheckTestFiles() {
 			panic("JSON mismatch")
 		}
 
-		loadedRowsUsingSplit, err := LoadRsvUsingSplit(filePath + ".rsv")
+		loadedRowsUsingSplit, err := LoadRsvUsingSplit(fpath + ".rsv")
 		if err != nil {
 			panic("Could not load RSV file")
 		}
@@ -332,28 +361,32 @@ func CheckTestFiles() {
 			panic("JSON mismatch")
 		}
 
-		isValid, err := IsValidRsvFile(filePath + ".rsv")
+		isValid, err := IsValidRsvFile(fpath + ".rsv")
 		if err != nil {
 			panic("Could not load RSV file")
 		}
-		if isValid == false {
+		if !isValid {
 			panic("Validation mismatch")
 		}
 	}
 
 	for i := 1; i <= 29; i++ {
-		filePath := fmt.Sprintf("./../TestFiles/Invalid_%03d", i)
-		fmt.Println("Checking invalid test file:", filePath)
-		_, err := LoadRsv(filePath + ".rsv")
+		fname := fmt.Sprintf("Invalid_%03d", i)
+		fpath := filepath.Join(testDir, fname)
+		relPath, _ := filepath.Rel(thisDir, fpath)
+
+		fmt.Println("Checking invalid test file:", relPath)
+
+		_, err := LoadRsv(fpath + ".rsv")
 		if err == nil {
 			panic("RSV document is valid")
 		}
 
-		isValid, err := IsValidRsvFile(filePath + ".rsv")
+		isValid, err := IsValidRsvFile(fpath + ".rsv")
 		if err != nil {
 			panic("Could not load RSV file")
 		}
-		if isValid == true {
+		if isValid {
 			panic("Validation mismatch")
 		}
 	}

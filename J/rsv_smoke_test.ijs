@@ -11,7 +11,8 @@ NB.
 NB. created: 2024jan10
 NB. changes: -----------------------------------------------------
 
-load 'rsv'
+load '~addons/jacks/rsv.ijs'
+NB. load 'rsv'
 
 NB. is configured folder (1 folder set, 0 otherwise): iscf '~RSVTEST'
 iscf_ijod_=:[: -. jpath_j_ -: ]
@@ -19,6 +20,7 @@ iscf_ijod_=:[: -. jpath_j_ -: ]
 NB. test folder must be configured
 iscf_ijod_ '~RSVTEST'
 
+NB. test files at: https://github.com/Stenway/RSV-Challenge/tree/main/TestFiles
 NB. valid test files must decode without errors and have no bad bytes
 valid_rsv=: 1 dir '~RSVTEST/Val*.rsv'
 rsvok@rsvdec@read&> valid_rsv

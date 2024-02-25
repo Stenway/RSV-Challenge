@@ -26,23 +26,23 @@ IFACEWORDSrsv=:<;._1 ' read rsvdec rsvenc rsvok write'
 NB. string used to mark RSV nulls
 NULLMARK=:'null'
 
-NB. root words (ROOTWORDSrsv) group      
-ROOTWORDSrsv=:<;._1 ' IFACEWORDSrsv ROOTWORDSrsv VMDrsv read rsvdec rsvenc rsvok write'
-
 NB. row terminator byte - hex: FD
-RSVEOR=:253{a.
+REOR=:253{a.
 
 NB. value terminator byte - hex: FF
-RSVEOV=:255{a.
+REOV=:255{a.
 
 NB. null value byte - hex: FE
-RSVNULL=:254{a.
+RNULL=:254{a.
+
+NB. root words (ROOTWORDSrsv) group      
+ROOTWORDSrsv=:<;._1 ' IFACEWORDSrsv ROOTWORDSrsv VMDrsv read rsvdec rsvenc rsvok write'
 
 NB. bytes that should never be emitted by UTF8 encoders
 UTF8BADBYTES=:_8{.a.
 
 NB. version, make count, and date
-VMDrsv=:'0.8.0';01;'12 Jan 2024 11:00:27'
+VMDrsv=:'0.9.0';7;'25 Feb 2024 11:39:28'
 
 NB. signal with optional message
 assert=:0 0"_ $ 13!:8^:((0: e. ])`(12"_))
@@ -63,7 +63,7 @@ NB.
 NB.   rsv=. read jpath '~RSVTEST/Valid_001.rsv'
 NB.   rsvdec rsv
 
-]`(NULLMARK"_)@.((,RSVNULL)&-:)L:0 <;._2&.> <;._2 y
+]`(NULLMARK"_)@.((,RNULL)&-:)L:0 <;._2&.> <;._2 y
 )
 
 
@@ -76,7 +76,7 @@ NB.
 NB.   rsv=. rsvdec read jpath '~RSVTEST/Valid_001.rsv'
 NB.   rsvenc rsv
 
-(0=#y) }. ; ,&RSVEOR&.> ;&.> RSVEOV -.&.>~ ,&RSVEOV L: 0 (]`(RSVNULL"_))@.(NULLMARK&-:) L: 0 y
+(0=#y) }. ; ,&REOR&.> ;&.> REOV -.&.>~ ,&REOV L: 0 (]`(RNULL"_))@.(NULLMARK&-:) L: 0 y
 )
 
 
@@ -111,8 +111,8 @@ write=:1!:2 ]`<@.(32&>@(3!:0))
 
 NB.POST_rsv post processor. 
 
-smoutput IFACE=: (0 : 0)
-NB. (rsv) interface word(s): 20240112j110027
+(".;(0=nc <'SHOWSMO_ijod_'){'1';'SHOWSMO_ijod_') smoutput IFACE=: (0 : 0)
+NB. (rsv) interface word(s): 20240225j113928
 NB. ------------------------
 NB. read    NB. reads a file as a list of bytes
 NB. rsvdec  NB. decode rsv bytes - marks nulls with (NULLMARK)

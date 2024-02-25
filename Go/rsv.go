@@ -1,4 +1,4 @@
-/* (C) Stefan John / Stenway / Stenway.com / 2023 */
+﻿/* (C) Stefan John / Stenway / Stenway.com / 2023 */
 
 package main
 
